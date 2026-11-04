@@ -29,3 +29,4 @@ bool save_bookings_file(const char *filename, const Booking *bookings, int booki
     (void)filename; (void)bookings; (void)bookingCount; (void)nextBookingId;
     return false;
 }
+

@@ -30,3 +30,4 @@ bool parse_time_slot(const char *input, char *canonical_out, size_t out_size);
 void print_districts_by_division(void);
 
 #endif /* DATA_H */
+

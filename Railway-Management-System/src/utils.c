@@ -244,3 +244,4 @@ int portable_mkdir(const char *dir_path) {
     return mkdir(dir_path, 0755);
 #endif
 }
+

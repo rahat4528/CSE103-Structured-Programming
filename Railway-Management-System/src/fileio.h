@@ -17,3 +17,4 @@ bool load_bookings_file(const char *filename, Booking *bookings, int *bookingCou
 bool save_bookings_file(const char *filename, const Booking *bookings, int bookingCount, int nextBookingId);
 
 #endif /* FILEIO_H */
+

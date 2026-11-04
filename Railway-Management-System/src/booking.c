@@ -81,3 +81,4 @@ void generateReportsAndStatistics(const Train *trains, int trainCount,
                                   const Booking *bookings, int bookingCount) {
     (void)trains; (void)trainCount; (void)bookings; (void)bookingCount;
 }
+

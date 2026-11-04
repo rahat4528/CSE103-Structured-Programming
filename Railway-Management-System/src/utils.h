@@ -27,3 +27,4 @@ bool parse_and_validate_date(const char *date_str, char *canonical_out, size_t o
 int portable_mkdir(const char *dir_path);
 
 #endif /* UTILS_H */
+

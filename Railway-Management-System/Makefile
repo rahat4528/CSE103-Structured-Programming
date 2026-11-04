@@ -17,3 +17,4 @@ clean:
 	rm -f $(OBJS) $(TARGET) $(TARGET).exe *.bak tickets/*.txt
 
 .PHONY: all clean
+

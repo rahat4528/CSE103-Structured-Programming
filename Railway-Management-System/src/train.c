@@ -92,25 +92,136 @@ bool addTrain(Train *trains, int *trainCount, const Train *newTrain) {
     return true;
 }
 
-/* Stubs for Stage 2 & Stage 5 (to be implemented in subsequent stages) */
 void searchTrainByNumber(const Train *trains, int trainCount, int trainNo) {
-    (void)trains; (void)trainCount; (void)trainNo;
+    if (!trains || trainCount <= 0) {
+        printf("\nNo matching trains.\n\n");
+        return;
+    }
+
+    int matches = 0;
+    for (int i = 0; i < trainCount; i++) {
+        if (trains[i].trainNo == trainNo) {
+            if (matches == 0) {
+                printf("\n--- Search Results for Train #%d ---\n", trainNo);
+                printTrainTableHeader();
+            }
+            showInfo(&trains[i]);
+            matches++;
+        }
+    }
+
+    if (matches == 0) {
+        printf("\nNo matching trains.\n\n");
+    } else {
+        printTrainTableFooter();
+        printf("Found %d matching train.\n\n", matches);
+    }
 }
 
 void searchTrainByName(const Train *trains, int trainCount, const char *keyword) {
-    (void)trains; (void)trainCount; (void)keyword;
+    if (!trains || trainCount <= 0 || !keyword || *keyword == '\0') {
+        printf("\nNo matching trains.\n\n");
+        return;
+    }
+
+    int matches = 0;
+    for (int i = 0; i < trainCount; i++) {
+        if (str_case_contains(trains[i].trainName, keyword)) {
+            if (matches == 0) {
+                printf("\n--- Search Results for Train Name containing \"%s\" ---\n", keyword);
+                printTrainTableHeader();
+            }
+            showInfo(&trains[i]);
+            matches++;
+        }
+    }
+
+    if (matches == 0) {
+        printf("\nNo matching trains.\n\n");
+    } else {
+        printTrainTableFooter();
+        printf("Found %d matching train(s).\n\n", matches);
+    }
 }
 
 void searchTrainByDistrict(const Train *trains, int trainCount, const char *district) {
-    (void)trains; (void)trainCount; (void)district;
+    if (!trains || trainCount <= 0 || !district || *district == '\0') {
+        printf("\nNo matching trains.\n\n");
+        return;
+    }
+
+    int matches = 0;
+    for (int i = 0; i < trainCount; i++) {
+        if (str_case_cmp(trains[i].sourceDistrict, district) == 0 ||
+            str_case_cmp(trains[i].destinationDistrict, district) == 0) {
+            if (matches == 0) {
+                printf("\n--- Search Results for District \"%s\" ---\n", district);
+                printTrainTableHeader();
+            }
+            showInfo(&trains[i]);
+            matches++;
+        }
+    }
+
+    if (matches == 0) {
+        printf("\nNo matching trains.\n\n");
+    } else {
+        printTrainTableFooter();
+        printf("Found %d matching train(s).\n\n", matches);
+    }
 }
 
 void searchTrainByTimeSlot(const Train *trains, int trainCount, const char *slot) {
-    (void)trains; (void)trainCount; (void)slot;
+    if (!trains || trainCount <= 0 || !slot || *slot == '\0') {
+        printf("\nNo matching trains.\n\n");
+        return;
+    }
+
+    int matches = 0;
+    for (int i = 0; i < trainCount; i++) {
+        if (str_case_cmp(trains[i].timeSlot, slot) == 0) {
+            if (matches == 0) {
+                printf("\n--- Search Results for Time Slot \"%s\" ---\n", slot);
+                printTrainTableHeader();
+            }
+            showInfo(&trains[i]);
+            matches++;
+        }
+    }
+
+    if (matches == 0) {
+        printf("\nNo matching trains.\n\n");
+    } else {
+        printTrainTableFooter();
+        printf("Found %d matching train(s).\n\n", matches);
+    }
 }
 
 void searchTrainByRoute(const Train *trains, int trainCount, const char *src, const char *dst) {
-    (void)trains; (void)trainCount; (void)src; (void)dst;
+    if (!trains || trainCount <= 0 || !src || !dst) {
+        printf("\nNo matching trains.\n\n");
+        return;
+    }
+
+    int matches = 0;
+    for (int i = 0; i < trainCount; i++) {
+        if (str_case_cmp(trains[i].sourceDistrict, src) == 0 &&
+            str_case_cmp(trains[i].destinationDistrict, dst) == 0) {
+            if (matches == 0) {
+                printf("\n--- Search Results for Route \"%s\" -> \"%s\" ---\n", src, dst);
+                printTrainTableHeader();
+            }
+            showInfo(&trains[i]);
+            matches++;
+        }
+    }
+
+    if (matches == 0) {
+        printf("\nNo matching trains.\n\n");
+    } else {
+        printTrainTableFooter();
+        printf("Found %d matching train(s).\n\n", matches);
+    }
 }
 
 bool updateTrain(Train *t, const char *newName, const char *newSrc, const char *newDst,
@@ -127,3 +238,4 @@ bool deleteTrain(Train *trains, int *trainCount, int trainNo) {
 void sortTrains(Train *trains, int trainCount, int criteria, bool ascending) {
     (void)trains; (void)trainCount; (void)criteria; (void)ascending;
 }
+

@@ -47,3 +47,4 @@ bool deleteTrain(Train *trains, int *trainCount, int trainNo);
 void sortTrains(Train *trains, int trainCount, int criteria, bool ascending);
 
 #endif /* TRAIN_H */
+

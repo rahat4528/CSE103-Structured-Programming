@@ -119,6 +119,109 @@ static void handleAddTrain(Train *trains, int *trainCount) {
     }
 }
 
+static void handleSearchTrain(const Train *trains, int trainCount) {
+    if (trainCount <= 0) {
+        printf("\nNo trains available to search.\n\n");
+        return;
+    }
+
+    while (1) {
+        printf("\n--- Search Train Menu ---\n");
+        printf(" 1. Search by Train Number\n");
+        printf(" 2. Search by Name Keyword\n");
+        printf(" 3. Search by District (Source or Destination)\n");
+        printf(" 4. Search by Time Slot\n");
+        printf(" 5. Search by Route (Source -> Destination)\n");
+        printf(" 6. Return to Main Menu\n");
+        printf("Enter search choice (1-6): ");
+
+        int subChoice = 0;
+        if (!safe_read_int(&subChoice, 1, 6)) {
+            printf("Invalid choice. Please enter a number between 1 and 6.\n");
+            if (feof(stdin)) break;
+            continue;
+        }
+
+        if (subChoice == 6) {
+            break;
+        }
+
+        switch (subChoice) {
+            case 1: {
+                printf("Enter Train Number to search: ");
+                int no = 0;
+                if (safe_read_int(&no, 1, 999999)) {
+                    searchTrainByNumber(trains, trainCount, no);
+                } else {
+                    printf("Invalid train number format.\n");
+                }
+                break;
+            }
+            case 2: {
+                char kw[64];
+                printf("Enter train name keyword: ");
+                if (safe_read_line(kw, sizeof(kw), stdin) && kw[0] != '\0') {
+                    searchTrainByName(trains, trainCount, kw);
+                } else {
+                    printf("Invalid or empty keyword.\n");
+                }
+                break;
+            }
+            case 3: {
+                char dist[64];
+                printf("Enter district name: ");
+                if (safe_read_line(dist, sizeof(dist), stdin) && dist[0] != '\0') {
+                    char canon[32];
+                    if (is_valid_district(dist, canon, sizeof(canon))) {
+                        searchTrainByDistrict(trains, trainCount, canon);
+                    } else {
+                        searchTrainByDistrict(trains, trainCount, dist);
+                    }
+                } else {
+                    printf("Invalid district input.\n");
+                }
+                break;
+            }
+            case 4: {
+                char slotBuf[64];
+                printf("Select Time Slot to search:\n");
+                printf("  1. 08:00 AM\n  2. 12:00 PM\n  3. 04:00 PM\n  4. 08:00 PM\n");
+                printf("Enter choice (1-4 or slot string): ");
+                if (safe_read_line(slotBuf, sizeof(slotBuf), stdin) && slotBuf[0] != '\0') {
+                    char canonSlot[16];
+                    if (parse_time_slot(slotBuf, canonSlot, sizeof(canonSlot))) {
+                        searchTrainByTimeSlot(trains, trainCount, canonSlot);
+                    } else {
+                        printf("Invalid time slot entered.\n");
+                    }
+                }
+                break;
+            }
+            case 5: {
+                char srcBuf[64], dstBuf[64];
+                char canonSrc[32], canonDst[32];
+                printf("Enter Source District: ");
+                if (!safe_read_line(srcBuf, sizeof(srcBuf), stdin) || srcBuf[0] == '\0') {
+                    printf("Invalid source district.\n");
+                    break;
+                }
+                printf("Enter Destination District: ");
+                if (!safe_read_line(dstBuf, sizeof(dstBuf), stdin) || dstBuf[0] == '\0') {
+                    printf("Invalid destination district.\n");
+                    break;
+                }
+
+                const char *srcQuery = is_valid_district(srcBuf, canonSrc, sizeof(canonSrc)) ? canonSrc : srcBuf;
+                const char *dstQuery = is_valid_district(dstBuf, canonDst, sizeof(canonDst)) ? canonDst : dstBuf;
+                searchTrainByRoute(trains, trainCount, srcQuery, dstQuery);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
+
 static void printMainMenu(void) {
     printf("===============================================================\n");
     printf("                  RAILWAY MANAGEMENT SYSTEM                    \n");
@@ -165,7 +268,6 @@ int main(void) {
         printMainMenu();
         if (!safe_read_int(&choice, 1, 16)) {
             printf("\nInvalid menu option. Please enter a number between 1 and 16.\n\n");
-            /* If EOF detected on stdin, exit loop */
             if (feof(stdin)) {
                 printf("\nEOF encountered. Exiting Railway Management System.\n");
                 break;
@@ -181,7 +283,7 @@ int main(void) {
                 viewAllTrains(trains, trainCount);
                 break;
             case 3:
-                printf("\n[Feature: Search Train will be unlocked in Stage 2]\n\n");
+                handleSearchTrain(trains, trainCount);
                 break;
             case 4:
                 printf("\n[Feature: Book Ticket will be unlocked in Stage 3]\n\n");
