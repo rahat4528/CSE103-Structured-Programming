@@ -1,4 +1,5 @@
 #include "booking.h"
+#include "data.h"
 #include "utils.h"
 #include <stdio.h>
 #include <string.h>
@@ -52,11 +53,88 @@ bool bookTicket(Booking *bookings, int *bookingCount, int *nextBookingId,
                 const char *passengerName, int trainNo, int seats,
                 const char *travelDate, const char *timeSlot,
                 Booking *out_booking) {
-    (void)bookings; (void)bookingCount; (void)nextBookingId;
-    (void)trains; (void)trainCount; (void)passengerName;
-    (void)trainNo; (void)seats; (void)travelDate;
-    (void)timeSlot; (void)out_booking;
-    return false;
+    if (!bookings || !bookingCount || !nextBookingId || !trains || !passengerName || !travelDate || !timeSlot) {
+        return false;
+    }
+
+    if (*bookingCount >= MAX_BOOKINGS) {
+        printf("Error: Maximum booking capacity reached (%d bookings).\n", MAX_BOOKINGS);
+        return false;
+    }
+
+    /* 1. Find train */
+    int trainIdx = findTrainIndexByNumber(trains, trainCount, trainNo);
+    if (trainIdx < 0) {
+        printf("Error: Train number %d not found.\n", trainNo);
+        return false;
+    }
+
+    /* 2. Validate seats count (1 to 10) */
+    if (seats < 1 || seats > MAX_SEATS_PER_BOOKING) {
+        printf("Error: Invalid seat quantity %d (allowed: 1 to %d seats per booking).\n",
+               seats, MAX_SEATS_PER_BOOKING);
+        return false;
+    }
+
+    /* 3. Check seats availability (never reduce seats on failure) */
+    if (trains[trainIdx].seatsAvailable < seats) {
+        printf("Error: Not enough seats available on Train %d. Requested: %d, Available: %d.\n",
+               trainNo, seats, trains[trainIdx].seatsAvailable);
+        return false;
+    }
+
+    /* 4. Validate time slot matches the train */
+    char canonicalSlot[TIME_SLOT_LEN];
+    if (!parse_time_slot(timeSlot, canonicalSlot, sizeof(canonicalSlot))) {
+        printf("Error: Invalid time slot format: \"%s\".\n", timeSlot);
+        return false;
+    }
+
+    if (str_case_cmp(trains[trainIdx].timeSlot, canonicalSlot) != 0) {
+        printf("Error: Time slot mismatch with the train. Train runs at \"%s\", but \"%s\" was requested.\n",
+               trains[trainIdx].timeSlot, canonicalSlot);
+        return false;
+    }
+
+    /* 5. Validate travel date */
+    char canonicalDate[DATE_LEN];
+    if (!parse_and_validate_date(travelDate, canonicalDate, sizeof(canonicalDate))) {
+        printf("Error: Invalid travel date \"%s\". Date must be valid DD-MM-YYYY and not in the past.\n", travelDate);
+        return false;
+    }
+
+    /* 6. Pricing & Group Discount calculation */
+    double basePrice = seats * trains[trainIdx].pricePerSeat;
+    double discount = 0.0;
+    if (seats >= 5) {
+        discount = basePrice * ((double)GROUP_DISCOUNT_PERCENT / 100.0);
+    }
+    double totalPrice = basePrice - discount;
+
+    /* 7. Deduct seats from train only upon confirmed validation */
+    trains[trainIdx].seatsAvailable -= seats;
+
+    /* 8. Construct booking record */
+    Booking *b = &bookings[*bookingCount];
+    memset(b, 0, sizeof(Booking));
+    snprintf(b->bookingId, sizeof(b->bookingId), "BK%04d", *nextBookingId);
+    (*nextBookingId)++;
+
+    snprintf(b->passengerName, sizeof(b->passengerName), "%s", passengerName);
+    b->trainNo = trainNo;
+    b->seats = seats;
+    snprintf(b->travelDate, sizeof(b->travelDate), "%s", canonicalDate);
+    snprintf(b->timeSlot, sizeof(b->timeSlot), "%s", trains[trainIdx].timeSlot);
+    b->totalPrice = totalPrice;
+    snprintf(b->status, sizeof(b->status), "%s", "CONFIRMED");
+
+    (*bookingCount)++;
+
+    if (out_booking) {
+        *out_booking = *b;
+    }
+
+    return true;
 }
 
 bool cancelBookingById(Booking *bookings, int bookingCount, Train *trains, int trainCount,

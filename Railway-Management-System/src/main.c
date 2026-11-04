@@ -222,6 +222,151 @@ static void handleSearchTrain(const Train *trains, int trainCount) {
     }
 }
 
+static void handleBookTicket(Booking *bookings, int *bookingCount, int *nextBookingId,
+                             Train *trains, int trainCount) {
+    if (trainCount <= 0) {
+        printf("\nNo trains available to book. Please add or load trains first.\n\n");
+        return;
+    }
+
+    if (*bookingCount >= MAX_BOOKINGS) {
+        printf("\nError: Maximum booking limit reached (%d bookings).\n\n", MAX_BOOKINGS);
+        return;
+    }
+
+    printf("\n--- Book Train Ticket ---\n");
+
+    /* 1. Passenger Name */
+    char passengerName[PASSENGER_NAME_LEN];
+    if (!safe_read_name(passengerName, sizeof(passengerName), "Passenger Name")) {
+        printf("\nBooking cancelled.\n");
+        return;
+    }
+
+    /* 2. Train Number */
+    int trainNo = 0;
+    const Train *selectedTrain = NULL;
+    while (1) {
+        printf("Enter Train Number: ");
+        if (!safe_read_int(&trainNo, 1, 999999)) {
+            printf("Invalid train number format. Enter a positive number.\n");
+            continue;
+        }
+
+        selectedTrain = findTrainByNumber(trains, trainCount, trainNo);
+        if (!selectedTrain) {
+            printf("Error: Train number %d not found. Please check available trains.\n", trainNo);
+            printf("Do you want to try another train number? (1=Yes, 2=Cancel): ");
+            int retry = 0;
+            if (!safe_read_int(&retry, 1, 2) || retry == 2) {
+                printf("\nBooking cancelled.\n");
+                return;
+            }
+            continue;
+        }
+
+        if (selectedTrain->seatsAvailable <= 0) {
+            printf("Error: Train %d (%s) is fully booked (0 seats available).\n",
+                   selectedTrain->trainNo, selectedTrain->trainName);
+            return;
+        }
+        break;
+    }
+
+    printf("\nSelected Train: %d - %s\n", selectedTrain->trainNo, selectedTrain->trainName);
+    printf("Route: %s -> %s | Time: %s | Seats Available: %d | Price/Seat: %.2f BDT\n\n",
+           selectedTrain->sourceDistrict, selectedTrain->destinationDistrict,
+           selectedTrain->timeSlot, selectedTrain->seatsAvailable, selectedTrain->pricePerSeat);
+
+    /* 3. Number of seats (1 to 10) */
+    int seats = 0;
+    while (1) {
+        printf("Enter Number of Seats (1 - %d): ", MAX_SEATS_PER_BOOKING);
+        if (!safe_read_int(&seats, 1, MAX_SEATS_PER_BOOKING)) {
+            printf("Invalid seat quantity. You can book between 1 and %d seats.\n", MAX_SEATS_PER_BOOKING);
+            continue;
+        }
+        if (seats > selectedTrain->seatsAvailable) {
+            printf("Error: Not enough seats available. Requested: %d, Available: %d.\n",
+                   seats, selectedTrain->seatsAvailable);
+            continue;
+        }
+        break;
+    }
+
+    /* 4. Travel Date (DD-MM-YYYY, real date, not in past) */
+    char travelDate[DATE_LEN];
+    while (1) {
+        char dateBuf[64];
+        printf("Enter Travel Date (DD-MM-YYYY, e.g. 15-11-2026): ");
+        if (!safe_read_line(dateBuf, sizeof(dateBuf), stdin)) {
+            printf("\nBooking cancelled.\n");
+            return;
+        }
+        if (!parse_and_validate_date(dateBuf, travelDate, sizeof(travelDate))) {
+            printf("Invalid date. Must be in DD-MM-YYYY format, valid calendar day, and not in the past.\n");
+            continue;
+        }
+        break;
+    }
+
+    /* 5. Time Slot (must match train's time slot) */
+    char slotChoice[64];
+    while (1) {
+        printf("Confirm Time Slot for this train (scheduled at %s):\n", selectedTrain->timeSlot);
+        printf("  1. 08:00 AM\n  2. 12:00 PM\n  3. 04:00 PM\n  4. 08:00 PM\n");
+        printf("Enter Choice (1-4 or slot string): ");
+        if (!safe_read_line(slotChoice, sizeof(slotChoice), stdin)) {
+            printf("\nBooking cancelled.\n");
+            return;
+        }
+
+        char parsedSlot[TIME_SLOT_LEN];
+        if (!parse_time_slot(slotChoice, parsedSlot, sizeof(parsedSlot))) {
+            printf("Invalid time slot entered. Try again.\n");
+            continue;
+        }
+
+        if (str_case_cmp(selectedTrain->timeSlot, parsedSlot) != 0) {
+            printf("Error: Time slot mismatch with the train. Train runs at \"%s\", not \"%s\".\n",
+                   selectedTrain->timeSlot, parsedSlot);
+            continue;
+        }
+        break;
+    }
+
+    /* 6. Execute booking */
+    Booking newBooking;
+    if (bookTicket(bookings, bookingCount, nextBookingId,
+                   trains, trainCount,
+                   passengerName, trainNo, seats,
+                   travelDate, selectedTrain->timeSlot,
+                   &newBooking)) {
+        double baseTotal = seats * selectedTrain->pricePerSeat;
+        double discount = (seats >= 5) ? (baseTotal * GROUP_DISCOUNT_PERCENT / 100.0) : 0.0;
+
+        printf("\n===============================================================\n");
+        printf("                  BOOKING CONFIRMATION RECEIPT                 \n");
+        printf("===============================================================\n");
+        printf(" Booking ID       : %s\n", newBooking.bookingId);
+        printf(" Status           : %s\n", newBooking.status);
+        printf(" Passenger Name   : %s\n", newBooking.passengerName);
+        printf(" Train Number     : %d (%s)\n", selectedTrain->trainNo, selectedTrain->trainName);
+        printf(" Route            : %s -> %s\n", selectedTrain->sourceDistrict, selectedTrain->destinationDistrict);
+        printf(" Travel Date      : %s\n", newBooking.travelDate);
+        printf(" Time Slot        : %s\n", newBooking.timeSlot);
+        printf(" Seats Booked     : %d\n", newBooking.seats);
+        printf(" Base Fare        : %.2f BDT\n", baseTotal);
+        if (seats >= 5) {
+            printf(" Group Discount   : -%.2f BDT (%d%% applied for %d seats)\n",
+                   discount, GROUP_DISCOUNT_PERCENT, seats);
+        }
+        printf(" Total Paid       : %.2f BDT\n", newBooking.totalPrice);
+        printf(" Seats Remaining  : %d\n", selectedTrain->seatsAvailable);
+        printf("===============================================================\n\n");
+    }
+}
+
 static void printMainMenu(void) {
     printf("===============================================================\n");
     printf("                  RAILWAY MANAGEMENT SYSTEM                    \n");
@@ -286,7 +431,7 @@ int main(void) {
                 handleSearchTrain(trains, trainCount);
                 break;
             case 4:
-                printf("\n[Feature: Book Ticket will be unlocked in Stage 3]\n\n");
+                handleBookTicket(bookings, &bookingCount, &nextBookingId, trains, trainCount);
                 break;
             case 5:
                 viewAllBookings(bookings, bookingCount);
