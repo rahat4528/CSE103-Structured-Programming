@@ -7,7 +7,30 @@
 #include <stdlib.h>
 #include <string.h>
 
+static bool verify_admin_pin(void) {
+    const char *correctPin = ADMIN_PIN;
+    char enteredPin[32];
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        printf("Enter Admin PIN (Attempt %d/3): ", attempt);
+        if (!safe_read_line(enteredPin, sizeof(enteredPin), stdin)) {
+            printf("\nPIN entry cancelled.\n");
+            return false;
+        }
+        if (strcmp(enteredPin, correctPin) == 0) {
+            printf("Admin authentication successful.\n");
+            return true;
+        }
+        printf("Incorrect PIN. Please try again.\n");
+    }
+    printf("Access Denied: Maximum attempts exceeded. Returning to main menu.\n\n");
+    return false;
+}
+
 static void handleAddTrain(Train *trains, int *trainCount) {
+    if (!verify_admin_pin()) {
+        return;
+    }
+
     if (*trainCount >= MAX_TRAINS) {
         printf("\nError: Train capacity reached (maximum %d trains).\n\n", MAX_TRAINS);
         return;
@@ -367,6 +390,413 @@ static void handleBookTicket(Booking *bookings, int *bookingCount, int *nextBook
     }
 }
 
+static void handleCancelBooking(Booking *bookings, int bookingCount, Train *trains, int trainCount) {
+    if (bookingCount <= 0) {
+        printf("\nNo bookings available to cancel.\n\n");
+        return;
+    }
+
+    printf("\n--- Cancel Booking ---\n");
+    printf("Enter Booking ID (e.g. BK1001) or Passenger Name: ");
+    char query[64];
+    if (!safe_read_line(query, sizeof(query), stdin) || query[0] == '\0') {
+        printf("Cancellation aborted.\n\n");
+        return;
+    }
+
+    char targetId[64] = {0};
+
+    /* Check direct booking ID match */
+    for (int i = 0; i < bookingCount; i++) {
+        if (str_case_cmp(bookings[i].bookingId, query) == 0) {
+            snprintf(targetId, sizeof(targetId), "%.*s", (int)sizeof(targetId) - 1, bookings[i].bookingId);
+            break;
+        }
+    }
+
+    if (targetId[0] == '\0') {
+        /* Search by passenger name */
+        int matchCount = 0;
+        int lastMatchIdx = -1;
+        for (int i = 0; i < bookingCount; i++) {
+            if (str_case_contains(bookings[i].passengerName, query)) {
+                if (matchCount == 0) {
+                    printf("\nMatching bookings for \"%s\":\n", query);
+                    printBookingTableHeader();
+                }
+                showBooking(&bookings[i]);
+                matchCount++;
+                lastMatchIdx = i;
+            }
+        }
+
+        if (matchCount == 0) {
+            printf("No bookings found matching \"%s\".\n\n", query);
+            return;
+        }
+
+        printBookingTableFooter();
+
+        if (matchCount == 1) {
+            snprintf(targetId, sizeof(targetId), "%.*s", (int)sizeof(targetId) - 1, bookings[lastMatchIdx].bookingId);
+        } else {
+            printf("Multiple bookings match. Please enter the specific Booking ID to cancel: ");
+            if (!safe_read_line(targetId, sizeof(targetId), stdin) || targetId[0] == '\0') {
+                printf("Cancellation aborted.\n\n");
+                return;
+            }
+        }
+    }
+
+    /* Locate booking record */
+    int bIdx = -1;
+    for (int i = 0; i < bookingCount; i++) {
+        if (str_case_cmp(bookings[i].bookingId, targetId) == 0) {
+            bIdx = i;
+            break;
+        }
+    }
+
+    if (bIdx < 0) {
+        printf("Error: Booking ID \"%s\" not found.\n\n", targetId);
+        return;
+    }
+
+    if (strcmp(bookings[bIdx].status, "CANCELLED") == 0) {
+        printf("Notice: Booking %s is already cancelled.\n\n", bookings[bIdx].bookingId);
+        return;
+    }
+
+    printf("\nAre you sure you want to cancel booking %s for %s? (y/n): ",
+           bookings[bIdx].bookingId, bookings[bIdx].passengerName);
+    char confirm[16];
+    if (!safe_read_line(confirm, sizeof(confirm), stdin) || (confirm[0] != 'y' && confirm[0] != 'Y')) {
+        printf("Cancellation cancelled by user.\n\n");
+        return;
+    }
+
+    double refund = 0.0, fee = 0.0;
+    if (cancelBookingById(bookings, bookingCount, trains, trainCount, targetId, &refund, &fee)) {
+        int tIdx = findTrainIndexByNumber(trains, trainCount, bookings[bIdx].trainNo);
+        int remSeats = (tIdx >= 0) ? trains[tIdx].seatsAvailable : 0;
+
+        printf("\n===============================================================\n");
+        printf("                  BOOKING CANCELLATION RECEIPT                 \n");
+        printf("===============================================================\n");
+        printf(" Booking ID        : %s\n", bookings[bIdx].bookingId);
+        printf(" Passenger Name    : %s\n", bookings[bIdx].passengerName);
+        printf(" Train Number      : %d\n", bookings[bIdx].trainNo);
+        printf(" Seats Restored    : %d\n", bookings[bIdx].seats);
+        printf(" Original Fare     : %.2f BDT\n", bookings[bIdx].totalPrice);
+        printf(" Cancellation Fee  : %.2f BDT (%d%% retained)\n", fee, CANCEL_FEE_PERCENT);
+        printf(" Refund Amount     : %.2f BDT\n", refund);
+        printf(" Booking Status    : CANCELLED\n");
+        printf(" Train Seats Now   : %d\n", remSeats);
+        printf("===============================================================\n\n");
+    }
+}
+
+static void handleUpdateTrain(Train *trains, int trainCount) {
+    if (trainCount <= 0) {
+        printf("\nNo trains available to update.\n\n");
+        return;
+    }
+
+    if (!verify_admin_pin()) {
+        return;
+    }
+
+    printf("\n--- Update Train Details ---\n");
+    printf("Enter Train Number to update: ");
+    int tNo = 0;
+    if (!safe_read_int(&tNo, 1, 999999)) {
+        printf("Invalid train number.\n\n");
+        return;
+    }
+
+    Train *t = findTrainByNumberMutable(trains, trainCount, tNo);
+    if (!t) {
+        printf("Error: Train number %d not found.\n\n", tNo);
+        return;
+    }
+
+    printf("\nCurrent Train Details:\n");
+    showTrainDetails(t);
+
+    /* 1. New Name */
+    char newName[TRAIN_NAME_LEN];
+    char buf[TRAIN_NAME_LEN];
+    printf("Enter New Train Name (press Enter to keep \"%s\"): ", t->trainName);
+    if (safe_read_line(buf, sizeof(buf), stdin) && buf[0] != '\0') {
+        if (contains_comma(buf)) {
+            printf("Error: Name cannot contain commas. Update aborted.\n\n");
+            return;
+        }
+        snprintf(newName, sizeof(newName), "%s", buf);
+    } else {
+        snprintf(newName, sizeof(newName), "%s", t->trainName);
+    }
+
+    /* 2. New Source District */
+    char newSrc[DISTRICT_NAME_LEN];
+    printf("Enter New Source District (press Enter to keep \"%s\"): ", t->sourceDistrict);
+    if (safe_read_line(buf, sizeof(buf), stdin) && buf[0] != '\0') {
+        if (!is_valid_district(buf, newSrc, sizeof(newSrc))) {
+            printf("Invalid district: \"%s\". Update aborted.\n\n", buf);
+            return;
+        }
+    } else {
+        snprintf(newSrc, sizeof(newSrc), "%s", t->sourceDistrict);
+    }
+
+    /* 3. New Destination District */
+    char newDst[DISTRICT_NAME_LEN];
+    printf("Enter New Destination District (press Enter to keep \"%s\"): ", t->destinationDistrict);
+    if (safe_read_line(buf, sizeof(buf), stdin) && buf[0] != '\0') {
+        if (!is_valid_district(buf, newDst, sizeof(newDst))) {
+            printf("Invalid district: \"%s\". Update aborted.\n\n", buf);
+            return;
+        }
+    } else {
+        snprintf(newDst, sizeof(newDst), "%s", t->destinationDistrict);
+    }
+
+    if (str_case_cmp(newSrc, newDst) == 0) {
+        printf("Error: Source and Destination cannot be the same. Update aborted.\n\n");
+        return;
+    }
+
+    /* 4. New Time Slot */
+    char newSlot[TIME_SLOT_LEN];
+    printf("Enter New Time Slot (1-4 or slot string, press Enter to keep \"%s\"): ", t->timeSlot);
+    if (safe_read_line(buf, sizeof(buf), stdin) && buf[0] != '\0') {
+        if (!parse_time_slot(buf, newSlot, sizeof(newSlot))) {
+            printf("Invalid time slot. Update aborted.\n\n");
+            return;
+        }
+    } else {
+        snprintf(newSlot, sizeof(newSlot), "%s", t->timeSlot);
+    }
+
+    /* 5. New Seats Available (Block reducing seats below 0) */
+    int newSeats = t->seatsAvailable;
+    printf("Enter Available Seats (press Enter to keep %d): ", t->seatsAvailable);
+    if (safe_read_line(buf, sizeof(buf), stdin) && buf[0] != '\0') {
+        char *endptr = NULL;
+        long s = strtol(buf, &endptr, 10);
+        if (endptr == buf || *endptr != '\0' || s < 0 || s > 2000) {
+            printf("Invalid seats quantity (must be between 0 and 2000). Update aborted.\n\n");
+            return;
+        }
+        newSeats = (int)s;
+    }
+
+    /* 6. New Price */
+    double newPrice = t->pricePerSeat;
+    printf("Enter Price Per Seat in BDT (press Enter to keep %.2f): ", t->pricePerSeat);
+    if (safe_read_line(buf, sizeof(buf), stdin) && buf[0] != '\0') {
+        char *endptr = NULL;
+        double p = strtod(buf, &endptr);
+        if (endptr == buf || *endptr != '\0' || p <= 0.0) {
+            printf("Invalid seat price (must be positive). Update aborted.\n\n");
+            return;
+        }
+        newPrice = p;
+    }
+
+    if (updateTrain(t, newName, newSrc, newDst, newSlot, newSeats, newPrice)) {
+        printf("\nSuccess: Train %d updated successfully!\n", t->trainNo);
+        showTrainDetails(t);
+        printf("\n");
+    }
+}
+
+static void handleDeleteTrain(Train *trains, int *trainCount, const Booking *bookings, int bookingCount) {
+    if (*trainCount <= 0) {
+        printf("\nNo trains available to delete.\n\n");
+        return;
+    }
+
+    if (!verify_admin_pin()) {
+        return;
+    }
+
+    printf("\n--- Delete Train ---\n");
+    printf("Enter Train Number to delete: ");
+    int tNo = 0;
+    if (!safe_read_int(&tNo, 1, 999999)) {
+        printf("Invalid train number.\n\n");
+        return;
+    }
+
+    const Train *t = findTrainByNumber(trains, *trainCount, tNo);
+    if (!t) {
+        printf("Error: Train number %d not found.\n\n", tNo);
+        return;
+    }
+
+    /* Check if active bookings exist */
+    int activeBookings = countActiveBookingsForTrain(bookings, bookingCount, tNo);
+    if (activeBookings > 0) {
+        printf("\nError: Cannot delete Train %d (%s). There are %d active booking(s) associated with this train.\n",
+               tNo, t->trainName, activeBookings);
+        printf("Please cancel all active bookings for this train before attempting deletion.\n\n");
+        return;
+    }
+
+    printf("Are you sure you want to delete Train %d (%s)? (y/n): ", t->trainNo, t->trainName);
+    char confirm[16];
+    if (!safe_read_line(confirm, sizeof(confirm), stdin) || (confirm[0] != 'y' && confirm[0] != 'Y')) {
+        printf("Deletion cancelled by user.\n\n");
+        return;
+    }
+
+    if (deleteTrain(trains, trainCount, tNo)) {
+        printf("Success: Train %d deleted successfully.\n\n", tNo);
+    }
+}
+
+static void handleSortTrains(Train *trains, int trainCount) {
+    if (trainCount <= 1) {
+        printf("\nNot enough trains to sort (current count: %d).\n\n", trainCount);
+        return;
+    }
+
+    while (1) {
+        printf("\n--- Sort Trains ---\n");
+        printf(" 1. By Train Number (Ascending)\n");
+        printf(" 2. By Time Slot (Chronological: 08:00 AM -> 08:00 PM)\n");
+        printf(" 3. By Price (Ascending: Low to High)\n");
+        printf(" 4. By Price (Descending: High to Low)\n");
+        printf(" 5. By Seats Available (Descending: High to Low)\n");
+        printf(" 6. Return to Main Menu\n");
+        printf("Enter sort choice (1-6): ");
+
+        int choice = 0;
+        if (!safe_read_int(&choice, 1, 6)) {
+            printf("Invalid selection.\n");
+            if (feof(stdin)) break;
+            continue;
+        }
+
+        if (choice == 6) break;
+
+        switch (choice) {
+            case 1:
+                sortTrains(trains, trainCount, 1, true);
+                printf("\nSorted by Train Number (Ascending):\n");
+                break;
+            case 2:
+                sortTrains(trains, trainCount, 2, true);
+                printf("\nSorted by Time Slot (Chronological):\n");
+                break;
+            case 3:
+                sortTrains(trains, trainCount, 3, true);
+                printf("\nSorted by Price (Ascending):\n");
+                break;
+            case 4:
+                sortTrains(trains, trainCount, 3, false);
+                printf("\nSorted by Price (Descending):\n");
+                break;
+            case 5:
+                sortTrains(trains, trainCount, 4, false);
+                printf("\nSorted by Seats Available (Descending):\n");
+                break;
+            default:
+                break;
+        }
+
+        viewAllTrains(trains, trainCount);
+        break;
+    }
+}
+
+static void handleSearchBookings(const Booking *bookings, int bookingCount) {
+    if (bookingCount <= 0) {
+        printf("\nNo bookings made yet.\n\n");
+        return;
+    }
+
+    while (1) {
+        printf("\n--- Search Bookings ---\n");
+        printf(" 1. By Booking ID\n");
+        printf(" 2. By Passenger Name\n");
+        printf(" 3. By Train Number\n");
+        printf(" 4. Return to Main Menu\n");
+        printf("Enter search choice (1-4): ");
+
+        int choice = 0;
+        if (!safe_read_int(&choice, 1, 4)) {
+            printf("Invalid choice.\n");
+            if (feof(stdin)) break;
+            continue;
+        }
+
+        if (choice == 4) break;
+
+        switch (choice) {
+            case 1: {
+                char idBuf[32];
+                printf("Enter Booking ID: ");
+                if (safe_read_line(idBuf, sizeof(idBuf), stdin) && idBuf[0] != '\0') {
+                    searchBookings(bookings, bookingCount, 1, idBuf, 0);
+                }
+                break;
+            }
+            case 2: {
+                char nameBuf[64];
+                printf("Enter Passenger Name: ");
+                if (safe_read_line(nameBuf, sizeof(nameBuf), stdin) && nameBuf[0] != '\0') {
+                    searchBookings(bookings, bookingCount, 2, nameBuf, 0);
+                }
+                break;
+            }
+            case 3: {
+                int tNo = 0;
+                printf("Enter Train Number: ");
+                if (safe_read_int(&tNo, 1, 999999)) {
+                    searchBookings(bookings, bookingCount, 3, NULL, tNo);
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
+
+static void handlePrintTicketReceipt(const Booking *bookings, int bookingCount,
+                                     const Train *trains, int trainCount) {
+    if (bookingCount <= 0) {
+        printf("\nNo bookings available to print receipt.\n\n");
+        return;
+    }
+
+    printf("\n--- Print Ticket Receipt ---\n");
+    printf("Enter Booking ID (e.g. BK1001): ");
+    char idBuf[32];
+    if (!safe_read_line(idBuf, sizeof(idBuf), stdin) || idBuf[0] == '\0') {
+        printf("Aborted.\n\n");
+        return;
+    }
+
+    const Booking *target = NULL;
+    for (int i = 0; i < bookingCount; i++) {
+        if (str_case_cmp(bookings[i].bookingId, idBuf) == 0) {
+            target = &bookings[i];
+            break;
+        }
+    }
+
+    if (!target) {
+        printf("Error: Booking ID \"%s\" not found.\n\n", idBuf);
+        return;
+    }
+
+    const Train *t = findTrainByNumber(trains, trainCount, target->trainNo);
+    printTicketReceipt(target, t, true);
+}
+
 static void printMainMenu(void) {
     printf("===============================================================\n");
     printf("                  RAILWAY MANAGEMENT SYSTEM                    \n");
@@ -480,25 +910,25 @@ int main(void) {
                 return 0;
             }
             case 9:
-                printf("\n[Feature: Cancel Booking will be unlocked in Stage 5]\n\n");
+                handleCancelBooking(bookings, bookingCount, trains, trainCount);
                 break;
             case 10:
-                printf("\n[Feature: Update Train will be unlocked in Stage 5]\n\n");
+                handleUpdateTrain(trains, trainCount);
                 break;
             case 11:
-                printf("\n[Feature: Delete Train will be unlocked in Stage 5]\n\n");
+                handleDeleteTrain(trains, &trainCount, bookings, bookingCount);
                 break;
             case 12:
-                printf("\n[Feature: Sort Trains will be unlocked in Stage 5]\n\n");
+                handleSortTrains(trains, trainCount);
                 break;
             case 13:
-                printf("\n[Feature: Search Bookings will be unlocked in Stage 5]\n\n");
+                handleSearchBookings(bookings, bookingCount);
                 break;
             case 14:
-                printf("\n[Feature: Print Receipt will be unlocked in Stage 5]\n\n");
+                handlePrintTicketReceipt(bookings, bookingCount, trains, trainCount);
                 break;
             case 15:
-                printf("\n[Feature: Reports will be unlocked in Stage 5]\n\n");
+                generateReportsAndStatistics(trains, trainCount, bookings, bookingCount);
                 break;
             case 16:
                 print_districts_by_division();

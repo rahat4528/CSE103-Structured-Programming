@@ -224,18 +224,76 @@ void searchTrainByRoute(const Train *trains, int trainCount, const char *src, co
     }
 }
 
-bool updateTrain(Train *t, const char *newName, const char *newSrc, const char *newDst,
-                 const char *newSlot, int newSeats, double newPrice) {
-    (void)t; (void)newName; (void)newSrc; (void)newDst; (void)newSlot; (void)newSeats; (void)newPrice;
-    return false;
+static int get_time_slot_order(const char *slot) {
+    if (str_case_cmp(slot, "08:00 AM") == 0 || str_case_cmp(slot, "8:00 AM") == 0) return 1;
+    if (str_case_cmp(slot, "12:00 PM") == 0) return 2;
+    if (str_case_cmp(slot, "04:00 PM") == 0 || str_case_cmp(slot, "4:00 PM") == 0) return 3;
+    if (str_case_cmp(slot, "08:00 PM") == 0 || str_case_cmp(slot, "8:00 PM") == 0) return 4;
+    return 99;
 }
 
-bool deleteTrain(Train *trains, int *trainCount, int trainNo) {
-    (void)trains; (void)trainCount; (void)trainNo;
-    return false;
+static int compare_trains(const Train *a, const Train *b, int criteria, bool ascending) {
+    int cmp = 0;
+    switch (criteria) {
+        case 1: /* Train Number */
+            cmp = (a->trainNo > b->trainNo) - (a->trainNo < b->trainNo);
+            break;
+        case 2: /* Time Slot Chronological */
+            cmp = get_time_slot_order(a->timeSlot) - get_time_slot_order(b->timeSlot);
+            break;
+        case 3: /* Price */
+            if (a->pricePerSeat > b->pricePerSeat) cmp = 1;
+            else if (a->pricePerSeat < b->pricePerSeat) cmp = -1;
+            else cmp = 0;
+            break;
+        case 4: /* Seats Available */
+            cmp = (a->seatsAvailable > b->seatsAvailable) - (a->seatsAvailable < b->seatsAvailable);
+            break;
+        default:
+            cmp = 0;
+            break;
+    }
+    return ascending ? cmp : -cmp;
 }
 
 void sortTrains(Train *trains, int trainCount, int criteria, bool ascending) {
-    (void)trains; (void)trainCount; (void)criteria; (void)ascending;
+    if (!trains || trainCount <= 1) return;
+
+    /* Stable Insertion Sort */
+    for (int i = 1; i < trainCount; i++) {
+        Train key = trains[i];
+        int j = i - 1;
+        while (j >= 0 && compare_trains(&trains[j], &key, criteria, ascending) > 0) {
+            trains[j + 1] = trains[j];
+            j--;
+        }
+        trains[j + 1] = key;
+    }
+}
+
+bool updateTrain(Train *t, const char *newName, const char *newSrc, const char *newDst,
+                 const char *newSlot, int newSeats, double newPrice) {
+    if (!t || !newName || !newSrc || !newDst || !newSlot) return false;
+    if (newSeats < 0 || newPrice <= 0.0) return false;
+
+    snprintf(t->trainName, sizeof(t->trainName), "%s", newName);
+    snprintf(t->sourceDistrict, sizeof(t->sourceDistrict), "%s", newSrc);
+    snprintf(t->destinationDistrict, sizeof(t->destinationDistrict), "%s", newDst);
+    snprintf(t->timeSlot, sizeof(t->timeSlot), "%s", newSlot);
+    t->seatsAvailable = newSeats;
+    t->pricePerSeat = newPrice;
+    return true;
+}
+
+bool deleteTrain(Train *trains, int *trainCount, int trainNo) {
+    if (!trains || !trainCount || *trainCount <= 0) return false;
+    int idx = findTrainIndexByNumber(trains, *trainCount, trainNo);
+    if (idx < 0) return false;
+
+    for (int i = idx; i < *trainCount - 1; i++) {
+        trains[i] = trains[i + 1];
+    }
+    (*trainCount)--;
+    return true;
 }
 

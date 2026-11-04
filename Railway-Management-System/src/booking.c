@@ -139,24 +139,241 @@ bool bookTicket(Booking *bookings, int *bookingCount, int *nextBookingId,
 
 bool cancelBookingById(Booking *bookings, int bookingCount, Train *trains, int trainCount,
                        const char *bookingId, double *out_refund, double *out_fee) {
-    (void)bookings; (void)bookingCount; (void)trains; (void)trainCount;
-    (void)bookingId; (void)out_refund; (void)out_fee;
+    if (!bookings || bookingCount <= 0 || !bookingId) return false;
+
+    for (int i = 0; i < bookingCount; i++) {
+        if (str_case_cmp(bookings[i].bookingId, bookingId) == 0) {
+            if (strcmp(bookings[i].status, "CANCELLED") == 0) {
+                printf("Notice: Booking %s is already marked CANCELLED.\n", bookings[i].bookingId);
+                return false;
+            }
+
+            /* 1. Restore train seats */
+            int tIdx = findTrainIndexByNumber(trains, trainCount, bookings[i].trainNo);
+            if (tIdx >= 0) {
+                trains[tIdx].seatsAvailable += bookings[i].seats;
+            }
+
+            /* 2. Update status */
+            snprintf(bookings[i].status, sizeof(bookings[i].status), "%s", "CANCELLED");
+
+            /* 3. Compute refund with 10% cancellation fee */
+            double fee = bookings[i].totalPrice * ((double)CANCEL_FEE_PERCENT / 100.0);
+            double refund = bookings[i].totalPrice - fee;
+
+            if (out_fee) *out_fee = fee;
+            if (out_refund) *out_refund = refund;
+
+            return true;
+        }
+    }
+
+    printf("Error: Booking ID \"%s\" not found.\n", bookingId);
     return false;
 }
 
 void searchBookings(const Booking *bookings, int bookingCount, int criteria,
                     const char *queryStr, int queryInt) {
-    (void)bookings; (void)bookingCount; (void)criteria;
-    (void)queryStr; (void)queryInt;
+    if (!bookings || bookingCount <= 0) {
+        printf("\nNo matching bookings found.\n\n");
+        return;
+    }
+
+    int matches = 0;
+    for (int i = 0; i < bookingCount; i++) {
+        bool match = false;
+        switch (criteria) {
+            case 1: /* By Booking ID */
+                if (queryStr && str_case_contains(bookings[i].bookingId, queryStr)) {
+                    match = true;
+                }
+                break;
+            case 2: /* By Passenger Name */
+                if (queryStr && str_case_contains(bookings[i].passengerName, queryStr)) {
+                    match = true;
+                }
+                break;
+            case 3: /* By Train Number */
+                if (bookings[i].trainNo == queryInt) {
+                    match = true;
+                }
+                break;
+            default:
+                break;
+        }
+
+        if (match) {
+            if (matches == 0) {
+                printf("\n--- Search Results for Bookings ---\n");
+                printBookingTableHeader();
+            }
+            showBooking(&bookings[i]);
+            matches++;
+        }
+    }
+
+    if (matches == 0) {
+        printf("\nNo matching bookings found.\n\n");
+    } else {
+        printBookingTableFooter();
+        printf("Found %d matching booking(s).\n\n", matches);
+    }
 }
 
 bool printTicketReceipt(const Booking *b, const Train *t, bool writeToFile) {
-    (void)b; (void)t; (void)writeToFile;
-    return false;
+    if (!b) return false;
+
+    const char *trainName = t ? t->trainName : "Unknown Train";
+    const char *src = t ? t->sourceDistrict : "N/A";
+    const char *dst = t ? t->destinationDistrict : "N/A";
+    double pricePerSeat = t ? t->pricePerSeat : 0.0;
+
+    /* Display receipt on screen */
+    printf("\n===============================================================\n");
+    printf("                  BANGLADESH RAILWAY E-TICKET                  \n");
+    printf("===============================================================\n");
+    printf(" Booking ID        : %s\n", b->bookingId);
+    printf(" Booking Status    : %s\n", b->status);
+    printf("---------------------------------------------------------------\n");
+    printf(" PASSENGER INFORMATION\n");
+    printf(" Passenger Name    : %s\n", b->passengerName);
+    printf(" Seats Booked      : %d\n", b->seats);
+    printf("---------------------------------------------------------------\n");
+    printf(" JOURNEY DETAILS\n");
+    printf(" Train Number      : %d (%s)\n", b->trainNo, trainName);
+    printf(" Route             : %s -> %s\n", src, dst);
+    printf(" Travel Date       : %s\n", b->travelDate);
+    printf(" Departure Slot    : %s\n", b->timeSlot);
+    printf("---------------------------------------------------------------\n");
+    printf(" FARE DETAILS\n");
+    if (pricePerSeat > 0.0) {
+        printf(" Fare Per Seat     : %.2f BDT\n", pricePerSeat);
+    }
+    printf(" Total Fare Paid   : %.2f BDT\n", b->totalPrice);
+    printf("===============================================================\n");
+    printf("       Thank you for traveling with Bangladesh Railway!        \n");
+    printf("===============================================================\n\n");
+
+    if (writeToFile) {
+        portable_mkdir("tickets");
+        char filePath[128];
+        snprintf(filePath, sizeof(filePath), "tickets/%s.txt", b->bookingId);
+
+        FILE *fp = fopen(filePath, "w");
+        if (!fp) {
+            printf("Notice: Could not write ticket file to \"%s\".\n", filePath);
+            return false;
+        }
+
+        fprintf(fp, "===============================================================\n");
+        fprintf(fp, "                  BANGLADESH RAILWAY E-TICKET                  \n");
+        fprintf(fp, "===============================================================\n");
+        fprintf(fp, " Booking ID        : %s\n", b->bookingId);
+        fprintf(fp, " Booking Status    : %s\n", b->status);
+        fprintf(fp, "---------------------------------------------------------------\n");
+        fprintf(fp, " PASSENGER INFORMATION\n");
+        fprintf(fp, " Passenger Name    : %s\n", b->passengerName);
+        fprintf(fp, " Seats Booked      : %d\n", b->seats);
+        fprintf(fp, "---------------------------------------------------------------\n");
+        fprintf(fp, " JOURNEY DETAILS\n");
+        fprintf(fp, " Train Number      : %d (%s)\n", b->trainNo, trainName);
+        fprintf(fp, " Route             : %s -> %s\n", src, dst);
+        fprintf(fp, " Travel Date       : %s\n", b->travelDate);
+        fprintf(fp, " Departure Slot    : %s\n", b->timeSlot);
+        fprintf(fp, "---------------------------------------------------------------\n");
+        fprintf(fp, " FARE DETAILS\n");
+        if (pricePerSeat > 0.0) {
+            fprintf(fp, " Fare Per Seat     : %.2f BDT\n", pricePerSeat);
+        }
+        fprintf(fp, " Total Fare Paid   : %.2f BDT\n", b->totalPrice);
+        fprintf(fp, "===============================================================\n");
+        fprintf(fp, "       Thank you for traveling with Bangladesh Railway!        \n");
+        fprintf(fp, "===============================================================\n");
+
+        fclose(fp);
+        printf("Ticket receipt saved to \"%s\".\n\n", filePath);
+    }
+
+    return true;
 }
 
 void generateReportsAndStatistics(const Train *trains, int trainCount,
                                   const Booking *bookings, int bookingCount) {
-    (void)trains; (void)trainCount; (void)bookings; (void)bookingCount;
+    printf("\n===============================================================\n");
+    printf("               RAILWAY SYSTEM REPORTS & STATISTICS             \n");
+    printf("===============================================================\n");
+
+    int activeBookings = 0;
+    int cancelledBookings = 0;
+    int totalSeatsSold = 0;
+    double confirmedRevenue = 0.0;
+    double cancellationFeesRetained = 0.0;
+
+    for (int i = 0; i < bookingCount; i++) {
+        if (strcmp(bookings[i].status, "CONFIRMED") == 0) {
+            activeBookings++;
+            totalSeatsSold += bookings[i].seats;
+            confirmedRevenue += bookings[i].totalPrice;
+        } else if (strcmp(bookings[i].status, "CANCELLED") == 0) {
+            cancelledBookings++;
+            cancellationFeesRetained += (bookings[i].totalPrice * ((double)CANCEL_FEE_PERCENT / 100.0));
+        }
+    }
+
+    double netRevenue = confirmedRevenue + cancellationFeesRetained;
+
+    printf(" Fleet Overview:\n");
+    printf("   Total Trains In Service       : %d\n", trainCount);
+    printf(" Booking Activity:\n");
+    printf("   Total Active Bookings         : %d\n", activeBookings);
+    printf("   Total Cancelled Bookings      : %d\n", cancelledBookings);
+    printf("   Total Tickets Issued          : %d\n", bookingCount);
+    printf("   Total Passenger Seats Sold    : %d\n", totalSeatsSold);
+    printf(" Financial Summary:\n");
+    printf("   Confirmed Ticket Revenue      : %.2f BDT\n", confirmedRevenue);
+    printf("   Retained Cancellation Fees    : %.2f BDT (%d%% rate)\n",
+           cancellationFeesRetained, CANCEL_FEE_PERCENT);
+    printf("   Net Total Revenue             : %.2f BDT\n", netRevenue);
+    printf("---------------------------------------------------------------\n");
+
+    /* Busiest route identification */
+    char busiestRoute[128] = "N/A";
+    int maxRouteSeats = 0;
+
+    for (int t = 0; t < trainCount; t++) {
+        int routeSeats = 0;
+        for (int b = 0; b < bookingCount; b++) {
+            if (bookings[b].trainNo == trains[t].trainNo &&
+                strcmp(bookings[b].status, "CONFIRMED") == 0) {
+                routeSeats += bookings[b].seats;
+            }
+        }
+        if (routeSeats > maxRouteSeats) {
+            maxRouteSeats = routeSeats;
+            snprintf(busiestRoute, sizeof(busiestRoute), "%s -> %s (%d seats booked)",
+                     trains[t].sourceDistrict, trains[t].destinationDistrict, maxRouteSeats);
+        }
+    }
+
+    printf(" Key Operational Metrics:\n");
+    printf("   Busiest Route                 : %s\n", busiestRoute);
+
+    /* Train with fewest seats remaining */
+    if (trainCount > 0 && trains) {
+        int minSeats = trains[0].seatsAvailable;
+        int minIdx = 0;
+        for (int i = 1; i < trainCount; i++) {
+            if (trains[i].seatsAvailable < minSeats) {
+                minSeats = trains[i].seatsAvailable;
+                minIdx = i;
+            }
+        }
+        printf("   Train with Fewest Seats Left  : Train %d (%s) with %d seat(s) remaining\n",
+               trains[minIdx].trainNo, trains[minIdx].trainName, trains[minIdx].seatsAvailable);
+    } else {
+        printf("   Train with Fewest Seats Left  : N/A\n");
+    }
+
+    printf("===============================================================\n\n");
 }
 

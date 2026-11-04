@@ -1,0 +1,8 @@
+999,MissingFields,Dhaka
+notanumber,BadTrain,Dhaka,Rangpur,08:00 AM,100,50.00
+108,BadDist,Atlantis,Rangpur,08:00 AM,100,50.00
+109,SameSrcDst,Dhaka,Dhaka,08:00 AM,100,50.00
+110,BadSlot,Dhaka,Rangpur,03:33 PM,100,50.00
+111,BadSeats,Dhaka,Rangpur,08:00 AM,-50,50.00
+112,BadPrice,Dhaka,Rangpur,08:00 AM,100,-10.00
+113,ValidTrain,Dhaka,Sylhet,08:00 AM,100,50.00

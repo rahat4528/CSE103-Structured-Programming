@@ -13,8 +13,10 @@ $(TARGET): $(OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+test: $(TARGET)
+	bash tests/run_tests.sh
+
 clean:
-	rm -f $(OBJS) $(TARGET) $(TARGET).exe *.bak tickets/*.txt
+	rm -f $(OBJS) $(TARGET) $(TARGET).exe *.bak tests/*.tmp tickets/*.txt
 
-.PHONY: all clean
-
+.PHONY: all test clean
