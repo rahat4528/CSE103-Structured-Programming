@@ -1,0 +1,9 @@
+# Railway Management System - Git Ignore
+*.exe
+*.o
+*.obj
+*.bak
+*.tmp
+tickets/
+build/
+.vscode/
