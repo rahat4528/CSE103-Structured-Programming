@@ -404,9 +404,18 @@ int main(void) {
     int bookingCount = 0;
     int nextBookingId = 1001;
 
-    (void)bookings;
-    (void)bookingCount;
-    (void)nextBookingId;
+    /* Auto-load trains.txt and bookings.txt at startup if they exist (silently ignore if missing) */
+    FILE *testTrains = fopen(TRAINS_DATA_FILE, "r");
+    if (testTrains) {
+        fclose(testTrains);
+        load_trains_file(TRAINS_DATA_FILE, trains, &trainCount, MAX_TRAINS, NULL, NULL);
+    }
+
+    FILE *testBookings = fopen(BOOKINGS_DATA_FILE, "r");
+    if (testBookings) {
+        fclose(testBookings);
+        load_bookings_file(BOOKINGS_DATA_FILE, bookings, &bookingCount, MAX_BOOKINGS, &nextBookingId, NULL, NULL);
+    }
 
     int choice = 0;
     while (1) {
@@ -436,15 +445,40 @@ int main(void) {
             case 5:
                 viewAllBookings(bookings, bookingCount);
                 break;
-            case 6:
-                printf("\n[Feature: Load Data will be unlocked in Stage 4]\n\n");
+            case 6: {
+                printf("\n--- Load Train & Booking Data ---\n");
+                int loaded = 0, skipped = 0;
+                load_trains_file(TRAINS_DATA_FILE, trains, &trainCount, MAX_TRAINS, &loaded, &skipped);
+                int bLoaded = 0, bSkipped = 0;
+                load_bookings_file(BOOKINGS_DATA_FILE, bookings, &bookingCount, MAX_BOOKINGS, &nextBookingId, &bLoaded, &bSkipped);
+                if (bLoaded > 0 || bSkipped > 0) {
+                    printf("Booking Data Load Summary: %d loaded, %d skipped.\n\n", bLoaded, bSkipped);
+                }
                 break;
-            case 7:
-                printf("\n[Feature: Save Data will be unlocked in Stage 4]\n\n");
+            }
+            case 7: {
+                printf("\n--- Save Train & Booking Data ---\n");
+                bool okT = save_trains_file(TRAINS_DATA_FILE, trains, trainCount);
+                bool okB = save_bookings_file(BOOKINGS_DATA_FILE, bookings, bookingCount, nextBookingId);
+                if (okT && okB) {
+                    printf("Success: Saved %d trains and %d bookings to file (backups created).\n\n",
+                           trainCount, bookingCount);
+                } else {
+                    printf("Warning: An error occurred while saving files.\n\n");
+                }
                 break;
-            case 8:
+            }
+            case 8: {
+                printf("\nDo you want to save train and booking data before exiting? (y/n): ");
+                char ans[16];
+                if (safe_read_line(ans, sizeof(ans), stdin) && (ans[0] == 'y' || ans[0] == 'Y')) {
+                    save_trains_file(TRAINS_DATA_FILE, trains, trainCount);
+                    save_bookings_file(BOOKINGS_DATA_FILE, bookings, bookingCount, nextBookingId);
+                    printf("All data successfully saved to file.\n");
+                }
                 printf("\nExiting Railway Management System. Goodbye!\n");
                 return 0;
+            }
             case 9:
                 printf("\n[Feature: Cancel Booking will be unlocked in Stage 5]\n\n");
                 break;

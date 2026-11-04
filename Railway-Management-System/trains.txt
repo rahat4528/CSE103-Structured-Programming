@@ -1,0 +1,7 @@
+101,Ekota Express,Dhaka,Rangpur,08:00 AM,120,50.00
+102,Suborno Express,Chattogram,Dhaka,12:00 PM,200,80.00
+103,Silk City Express,Rajshahi,Dhaka,04:00 PM,150,65.00
+104,Sundarban Express,Khulna,Dhaka,08:00 PM,140,75.00
+105,Parabat Express,Sylhet,Dhaka,08:00 AM,160,70.00
+106,Benapole Express,Jashore,Dhaka,12:00 PM,180,60.00
+107,Kurigram Express,Kurigram,Dhaka,08:00 PM,130,55.00
