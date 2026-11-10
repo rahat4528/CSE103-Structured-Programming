@@ -114,3 +114,4 @@ This folder covers multithreading principles, POSIX thread creation, parameter p
 - **Common Errors:**
   - Returning the address of a local automatic stack variable from the thread function (leads to undefined behavior / garbage values). Heap memory or pre-allocated caller structs must be used.
   - Reusing a single loop index pointer `&i` across all threads in `pthread_create()`, causing a race condition where multiple threads read the same modified index.
+

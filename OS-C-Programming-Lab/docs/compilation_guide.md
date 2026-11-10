@@ -111,3 +111,4 @@ gcc -std=c11 -Wall -Wextra practice/process_creation/fork_example.c -o fork_exam
 gcc -std=c11 -Wall -Wextra -pthread labs/mutex/mutex_counter.c -o mutex_counter
 ./mutex_counter
 ```
+

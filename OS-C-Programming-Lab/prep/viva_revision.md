@@ -61,3 +61,4 @@ This rapid revision guide covers high-frequency questions asked in Operating Sys
 
 ### 5. `Broken Pipe (SIGPIPE)`
 - **Cause:** Writing to a pipe or socket whose read end has already been closed by all reading processes.
+

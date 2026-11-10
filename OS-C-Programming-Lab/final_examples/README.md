@@ -164,3 +164,4 @@ This folder combines multiple core Operating Systems concepts into robust, cohes
   ```
 - **Common Errors:**
   - Freeing the struct container before freeing the nested `vec->data` buffer, causing an orphaned heap memory leak.
+

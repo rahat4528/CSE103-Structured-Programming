@@ -69,3 +69,4 @@ The `wait()` and `waitpid()` system calls suspend the parent process until one o
 - `fork()` **creates a new process** by duplicating the caller.
 - `exec()` (`execl`, `execv`, `execvp`, etc.) **replaces the current process image** with a completely new executable program.
 - When `exec()` is called, the current code, heap, and stack segments are discarded and replaced with the target program; the PID remains unchanged.
+

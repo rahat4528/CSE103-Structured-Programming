@@ -170,3 +170,4 @@ This folder covers file stream operations in C (`fopen`, `fgets`, `fprintf`, `fp
   ```
 - **Common Errors:**
   - Assuming `fseek()` can change the write position in append mode: POSIX guarantees that all writes in `"a"` mode are placed at the actual end of the file regardless of previous seek operations.
+

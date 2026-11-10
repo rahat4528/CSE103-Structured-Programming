@@ -54,3 +54,4 @@ This laboratory demonstrates mutual exclusion in concurrent programs, explains h
 - **Common Errors:**
   - Forgetting to unlock a mutex before exiting a function or thread, creating a permanent deadlock.
   - Attempting to destroy a locked mutex with `pthread_mutex_destroy()` (returns `EBUSY`).
+

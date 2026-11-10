@@ -229,3 +229,4 @@ Round Robin (Quantum = 4 ms):
 | `Bus error (core dumped)` | `mmap` called on 0-byte shared memory object | Call `ftruncate(fd, size)` before `mmap` |
 | Process hangs in `read()` | Pipe deadlock due to open write descriptor | Close unused write descriptor in reader process |
 | `Permission denied` on test script | Execution bit not set | Run `chmod +x scripts/smoke_test.sh` |
+

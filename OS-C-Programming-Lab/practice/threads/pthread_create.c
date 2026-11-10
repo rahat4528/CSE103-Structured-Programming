@@ -72,3 +72,4 @@ int main(void) {
     printf("[Main Thread] Worker thread has joined. Execution finished cleanly.\n");
     return EXIT_SUCCESS;
 }
+

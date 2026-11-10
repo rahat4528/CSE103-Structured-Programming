@@ -121,3 +121,4 @@ This folder covers foundational process creation, lifecycle management, and sync
 - **Common Errors:**
   - Forgetting to call `wait()` in the parent: if parent runs continuously without reaping terminated children, children remain zombies (`<defunct>`).
   - Misinterpreting the raw integer returned by `wait()` instead of using `WEXITSTATUS(status)`.
+

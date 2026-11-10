@@ -108,3 +108,4 @@ This folder covers POSIX counting and binary semaphores, resource pool throttlin
   ```
 - **Common Errors:**
   - Inverting lock order (locking `buffer_mutex` *before* `sem_wait(&empty_slots)`): If the buffer is full, the producer sleeps holding the mutex, preventing the consumer from ever entering to consume an item, deadlocking the system.
+

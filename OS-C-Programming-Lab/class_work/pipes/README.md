@@ -118,3 +118,4 @@ This folder covers unidirectional Inter-Process Communication (IPC) in Linux usi
 - **Common Errors:**
   - Failing to close the unused write end in the child: if the child keeps a write descriptor open, `read()` will block indefinitely waiting for EOF even after the parent closes its write descriptor (Pipe Deadlock).
   - Attempting to write to a pipe whose read end has been closed by all processes, triggering a `SIGPIPE` signal and terminating the writer abruptly.
+

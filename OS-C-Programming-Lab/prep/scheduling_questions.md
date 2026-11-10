@@ -54,3 +54,4 @@ Operating system scheduling algorithms are evaluated using five primary quantita
   - Processes that use their full quantum are demoted to lower-priority queues (CPU-bound penalty).
   - Processes that yield voluntarily for I/O stay in higher-priority queues (interactive boost).
   - Includes **Aging** (periodically boosting priority) to guarantee starvation prevention.
+

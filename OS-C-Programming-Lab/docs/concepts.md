@@ -89,3 +89,4 @@ When multiple execution threads read and write shared data concurrently without 
   - Can be Binary ($0, 1$) or Counting ($N$ units).
 - **Producer-Consumer Problem:**
   - Classic concurrency challenge where producers and consumers coordinate over a bounded buffer using counting semaphores and mutex locks without buffer overflow, buffer underflow, or deadlock.
+

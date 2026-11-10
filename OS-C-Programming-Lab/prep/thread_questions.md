@@ -79,3 +79,4 @@ void pthread_exit(void *retval);
 ## 6. What is Thread Safety and Reentrancy?
 - **Thread Safety:** Code that functions correctly and produces consistent results when executed concurrently by multiple threads without uncoordinated shared state.
 - **Reentrant Function:** A function that can be safely interrupted in the middle of execution, re-entered by another thread or signal handler, and resumed without state corruption (avoids static/global variables; uses caller-supplied buffers, e.g. `strtok_r` instead of `strtok`).
+

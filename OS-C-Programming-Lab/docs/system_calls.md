@@ -174,3 +174,4 @@ int sem_destroy(sem_t *sem);
 - **Description:** Manages counting semaphores for thread/process coordination.
 - **`pshared` parameter:** Pass `0` for intra-process thread synchronization.
 - **`value` parameter:** Initial permit count.
+

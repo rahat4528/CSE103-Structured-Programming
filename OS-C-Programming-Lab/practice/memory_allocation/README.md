@@ -174,3 +174,4 @@ This folder covers dynamic heap memory management in C using the standard C libr
 - **Common Errors:**
   - Writing `ptr = realloc(ptr, new_size)`. If `realloc()` fails and returns `NULL`, the original pointer `ptr` is overwritten and its memory is orphaned (leaked permanently).
   - Accessing the old pointer after `realloc()` moved the buffer to a new heap address.
+

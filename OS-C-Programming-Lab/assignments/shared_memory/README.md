@@ -148,3 +148,4 @@ POSIX shared memory objects persist in the kernel (`/dev/shm`) until explicitly 
 - **Common Errors:**
   - Calling `shm_unlink()` too early before reader runs, causing `shm_open()` in the reader to fail with `ENOENT`.
   - Writing to memory mapped with `PROT_READ`, triggering `SIGSEGV` (Segmentation fault).
+

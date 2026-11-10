@@ -64,3 +64,4 @@ Deadlock can arise **if and only if** all four conditions hold simultaneously:
 2. **Avoidance:** Dynamically examine resource allocation state to ensure system never enters an unsafe state (e.g., **Dijkstra's Banker's Algorithm**).
 3. **Detection and Recovery:** Periodically construct a Resource-Allocation Graph (Wait-For Graph), detect cycles, and abort processes or preempt resources to break deadlocks.
 4. **Ignoration (Ostrich Algorithm):** Ignore the problem under the assumption that deadlocks occur rarely and prevention overhead outweighs the cost (approach taken by general-purpose OS kernels like Linux).
+
