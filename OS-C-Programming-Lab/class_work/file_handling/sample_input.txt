@@ -1,0 +1,5 @@
+Operating Systems Laboratory
+Course: Operating Systems & System Programming
+Topic: File Subsystems and Stream Buffering
+Key Concept: Standard C Streams vs POSIX File Descriptors
+File Handling Status: Ready

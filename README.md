@@ -37,6 +37,7 @@ Comprehensive, production-grade terminal applications demonstrating separation o
 | **Blood Group Management System** | [`./c-blood-group-management`](./c-blood-group-management) | **Strict C99 modular medical dispatch & inventory platform** built on a linked list, a BST ID index, a phone hash table, 8 classified blood buckets, a request queue, a priority max heap, a bounded undo stack, a city graph (Dijkstra nearest-donor ranking), and a doubly linked history list with bidirectional pagination. |
 | **Screen Sense** | [`./project_01_Screen_Sense`](./project_01_Screen_Sense) | **Digital wellbeing and ergonomics calculator**. Evaluates multi-device screen exposure (desktop, laptop, mobile), computes daily eye-strain risk factors, and provides behavioral usage guidelines. |
 | **Code Quizzer** | [`./project_02_code_quizzer`](./project_02_code_quizzer) | **Interactive terminal knowledge assessment engine**. Generates randomized technical questionnaires evaluating core programming concepts, score calculation, and performance metrics. |
+| **OS C Programming Lab** | [`./OS-C-Programming-Lab`](./OS-C-Programming-Lab) | **Comprehensive Operating Systems & Linux System Programming Laboratory** implementing 6 modular categories: Process Creation (`fork`/`wait`), POSIX Multithreading (`pthreads`), Dynamic Heap Management (`malloc`/`calloc`/`realloc`/`free`), IPC Pipelines (`pipe`), Zero-Copy Shared Memory (`shm_open`/`mmap`), CPU Scheduling Simulations (FCFS, Non-preemptive SJF, Round Robin with Gantt charts), Critical Section Mutexes (`pthread_mutex_t`), Counting Semaphores (`sem_t`), Bounded-Buffer Producer-Consumer coordination, Duplex IPC, and viva preparation notes. Includes master GNU Makefile and automated smoke test suite. |
 
 ---
 
@@ -113,6 +114,29 @@ make test
 # Launch the application
 ./build/bgms       # Linux / macOS
 .\build\bgms.exe   # Windows
+```
+
+---
+
+### Building and Testing the OS C Programming Lab
+
+```bash
+# Navigate to the OS lab module
+cd OS-C-Programming-Lab
+
+# Build all programs across all categories
+make
+
+# Run automated smoke test suite
+make test
+
+# Build individual topics
+make practice
+make class_work
+make assignments
+make labs
+make final_examples
+make prep
 ```
 
 ---
