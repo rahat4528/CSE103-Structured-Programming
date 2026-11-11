@@ -43,18 +43,29 @@ int main(void) {
     int pipe_p2c[2];
     int pipe_c2p[2];
 
-    if (pipe(pipe_p2c) == -1 || pipe(pipe_c2p) == -1) {
-        perror("Failed to create pipes");
+    if (pipe(pipe_p2c) == -1) {
+        perror("Failed to create parent-to-child pipe");
+        return EXIT_FAILURE;
+    }
+    if (pipe(pipe_c2p) == -1) {
+        perror("Failed to create child-to-parent pipe");
+        close(pipe_p2c[0]);
+        close(pipe_p2c[1]);
         return EXIT_FAILURE;
     }
 
     printf("[Parent] Pipes created:\n");
     printf("  Parent-to-Child Pipe: read_fd=%d, write_fd=%d\n", pipe_p2c[0], pipe_p2c[1]);
     printf("  Child-to-Parent Pipe: read_fd=%d, write_fd=%d\n\n", pipe_c2p[0], pipe_c2p[1]);
+    fflush(stdout);
 
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork failed");
+        close(pipe_p2c[0]);
+        close(pipe_p2c[1]);
+        close(pipe_c2p[0]);
+        close(pipe_c2p[1]);
         return EXIT_FAILURE;
     }
 
@@ -62,9 +73,8 @@ int main(void) {
         // ----------------------------------------------------
         // CHILD PROCESS: COMPUTATION WORKER
         // ----------------------------------------------------
-        // Close unused descriptors:
-        // Child reads from p2c[0], so close p2c[1]
-        // Child writes to c2p[1], so close c2p[0]
+        // Child reads from p2c[0] -> close p2c[1]
+        // Child writes to c2p[1] -> close c2p[0]
         close(pipe_p2c[1]);
         close(pipe_c2p[0]);
 
@@ -72,8 +82,15 @@ int main(void) {
 
         TaskPayload request;
         ssize_t bytes_in = read(pipe_p2c[0], &request, sizeof(TaskPayload));
-        if (bytes_in <= 0) {
-            perror("child read error");
+        if (bytes_in != (ssize_t)sizeof(TaskPayload)) {
+            fprintf(stderr, "  [Child] Failed to read complete TaskPayload (got %zd bytes).\n", bytes_in);
+            close(pipe_p2c[0]);
+            close(pipe_c2p[1]);
+            exit(EXIT_FAILURE);
+        }
+
+        if (request.count <= 0 || request.count > DATA_SIZE) {
+            fprintf(stderr, "  [Child] Invalid payload element count: %d\n", request.count);
             close(pipe_p2c[0]);
             close(pipe_c2p[1]);
             exit(EXIT_FAILURE);
@@ -101,22 +118,24 @@ int main(void) {
 
         printf("  [Child] Calculation complete. Sending response back to parent...\n");
         ssize_t bytes_out = write(pipe_c2p[1], &result, sizeof(TaskResult));
-        if (bytes_out <= 0) {
+        if (bytes_out != (ssize_t)sizeof(TaskResult)) {
             perror("child write error");
+            close(pipe_p2c[0]);
+            close(pipe_c2p[1]);
+            exit(EXIT_FAILURE);
         }
 
-        // Clean closure
         close(pipe_p2c[0]);
         close(pipe_c2p[1]);
         printf("  [Child] Closed descriptors. Exiting.\n");
+        fflush(stdout);
         exit(EXIT_SUCCESS);
     } else {
         // ----------------------------------------------------
         // PARENT PROCESS: ORCHESTRATOR
         // ----------------------------------------------------
-        // Close unused descriptors:
-        // Parent writes to p2c[1], so close p2c[0]
-        // Parent reads from c2p[0], so close c2p[1]
+        // Parent writes to p2c[1] -> close p2c[0]
+        // Parent reads from c2p[0] -> close c2p[1]
         close(pipe_p2c[0]);
         close(pipe_c2p[1]);
 
@@ -128,27 +147,46 @@ int main(void) {
         task.numbers[3] = 63;
         task.numbers[4] = 29;
 
-        printf("[Parent] Dispatching task with %d numbers to Child PID %d...\n", 
+        printf("[Parent] Dispatching task with %d numbers to Child PID %d...\n",
                task.count, (int)pid);
-        write(pipe_p2c[1], &task, sizeof(TaskPayload));
+        ssize_t bytes_out = write(pipe_p2c[1], &task, sizeof(TaskPayload));
+        if (bytes_out != (ssize_t)sizeof(TaskPayload)) {
+            perror("parent write error");
+            close(pipe_p2c[1]);
+            close(pipe_c2p[0]);
+            waitpid(pid, NULL, 0);
+            return EXIT_FAILURE;
+        }
         close(pipe_p2c[1]); // Close write end to signal EOF to child
 
         // Read response from child
         TaskResult response;
         printf("[Parent] Waiting for computation results from child...\n");
         ssize_t bytes_in = read(pipe_c2p[0], &response, sizeof(TaskResult));
-        if (bytes_in > 0) {
-            printf("\n[Parent] Results received from child:\n");
-            printf("  Sum     : %d\n", response.sum);
-            printf("  Average : %.2f\n", response.average);
-            printf("  Minimum : %d\n", response.min_val);
-            printf("  Maximum : %d\n", response.max_val);
-        }
         close(pipe_c2p[0]);
 
-        // Reap child
+        if (bytes_in != (ssize_t)sizeof(TaskResult)) {
+            fprintf(stderr, "[Parent] Failed to read complete TaskResult (got %zd bytes).\n", bytes_in);
+            waitpid(pid, NULL, 0);
+            return EXIT_FAILURE;
+        }
+
+        printf("\n[Parent] Results received from child:\n");
+        printf("  Sum     : %d\n", response.sum);
+        printf("  Average : %.2f\n", response.average);
+        printf("  Minimum : %d\n", response.min_val);
+        printf("  Maximum : %d\n", response.max_val);
+
+        // Reap child and check exit status
         int status = 0;
-        waitpid(pid, &status, 0);
+        if (waitpid(pid, &status, 0) < 0) {
+            perror("waitpid failed");
+            return EXIT_FAILURE;
+        }
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            fprintf(stderr, "[Parent] Child process exited with an error.\n");
+            return EXIT_FAILURE;
+        }
 
         printf("\n[Parent] Child reaped. Bidirectional IPC test passed successfully.\n");
         printf("====================================================\n");
@@ -156,4 +194,3 @@ int main(void) {
 
     return EXIT_SUCCESS;
 }
-

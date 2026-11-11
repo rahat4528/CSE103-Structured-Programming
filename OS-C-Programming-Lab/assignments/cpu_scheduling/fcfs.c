@@ -19,14 +19,7 @@
 #include <string.h>
 
 #define MAX_PROCESSES 10
-
-typedef struct {
-    int pid;
-    int burst_time;
-    int completion_time;
-    int turnaround_time;
-    int waiting_time;
-} Process;
+#define MAX_BURST_TIME 10000
 
 int main(int argc, char *argv[]) {
     printf("====================================================\n");
@@ -34,14 +27,32 @@ int main(int argc, char *argv[]) {
     printf("====================================================\n");
     printf("[Note] Educational model. All processes arrive at time t = 0.\n\n");
 
+    int use_default = 1;
+    if (argc > 1) {
+        if (strcmp(argv[1], "--custom") == 0) {
+            use_default = 0;
+        } else if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+            printf("Usage: %s [--custom | --help]\n", argv[0]);
+            printf("  (no args) : Run verified benchmark dataset (P1=6, P2=8, P3=7, P4=3)\n");
+            printf("  --custom  : Prompt for custom process count and burst times\n");
+            return EXIT_SUCCESS;
+        } else {
+            fprintf(stderr, "[Error] Unknown option: %s\n", argv[1]);
+            fprintf(stderr, "Usage: %s [--custom | --help]\n", argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+
+    typedef struct {
+        int pid;
+        int burst_time;
+        int completion_time;
+        int turnaround_time;
+        int waiting_time;
+    } Process;
+
     int n = 4;
     Process proc[MAX_PROCESSES];
-
-    // Check if running in automated/default demonstration mode
-    int use_default = 1;
-    if (argc > 1 && strcmp(argv[1], "--custom") == 0) {
-        use_default = 0;
-    }
 
     if (use_default) {
         printf("[Mode] Running with standard educational test dataset:\n");
@@ -52,14 +63,15 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Enter number of processes (1 - %d): ", MAX_PROCESSES);
         if (scanf("%d", &n) != 1 || n <= 0 || n > MAX_PROCESSES) {
-            fprintf(stderr, "Invalid process count.\n");
+            fprintf(stderr, "[Error] Invalid process count (must be 1 - %d).\n", MAX_PROCESSES);
             return EXIT_FAILURE;
         }
         for (int i = 0; i < n; i++) {
             proc[i].pid = i + 1;
-            printf("Enter Burst Time for Process P%d: ", proc[i].pid);
-            if (scanf("%d", &proc[i].burst_time) != 1 || proc[i].burst_time <= 0) {
-                fprintf(stderr, "Invalid burst time.\n");
+            printf("Enter Burst Time for Process P%d (1 - %d): ", proc[i].pid, MAX_BURST_TIME);
+            if (scanf("%d", &proc[i].burst_time) != 1 ||
+                proc[i].burst_time <= 0 || proc[i].burst_time > MAX_BURST_TIME) {
+                fprintf(stderr, "[Error] Invalid burst time (must be 1 - %d).\n", MAX_BURST_TIME);
                 return EXIT_FAILURE;
             }
         }
@@ -87,7 +99,7 @@ int main(int argc, char *argv[]) {
     }
     printf("\n0");
     for (int i = 0; i < n; i++) {
-        printf("        %2d", proc[i].completion_time);
+        printf("       %2d", proc[i].completion_time);
     }
     printf("\n\n");
 
@@ -108,4 +120,3 @@ int main(int argc, char *argv[]) {
 
     return EXIT_SUCCESS;
 }
-

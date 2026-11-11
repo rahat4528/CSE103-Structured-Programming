@@ -42,8 +42,8 @@ int main(void) {
     printf("    Outgoing Content : \"%s\" (%zu bytes)\n", outgoing_message, msg_len);
 
     ssize_t bytes_written = write(pipefd[1], outgoing_message, msg_len);
-    if (bytes_written == -1) {
-        perror("write to pipe failed");
+    if (bytes_written == -1 || (size_t)bytes_written != msg_len) {
+        perror("write to pipe failed or incomplete");
         close(pipefd[0]);
         close(pipefd[1]);
         return EXIT_FAILURE;
@@ -52,7 +52,11 @@ int main(void) {
 
     // Close write end before reading or after write is complete
     printf("[3] Closing write descriptor pipefd[1]...\n");
-    close(pipefd[1]);
+    if (close(pipefd[1]) == -1) {
+        perror("close write end failed");
+        close(pipefd[0]);
+        return EXIT_FAILURE;
+    }
 
     // Read from the pipe buffer
     char incoming_buffer[128];
@@ -60,8 +64,12 @@ int main(void) {
 
     printf("[4] Reading data from pipefd[0]...\n");
     ssize_t bytes_read = read(pipefd[0], incoming_buffer, sizeof(incoming_buffer) - 1);
-    if (bytes_read == -1) {
-        perror("read from pipe failed");
+    if (bytes_read <= 0) {
+        if (bytes_read == -1) {
+            perror("read from pipe failed");
+        } else {
+            fprintf(stderr, "Unexpected EOF while reading from pipe.\n");
+        }
         close(pipefd[0]);
         return EXIT_FAILURE;
     }
@@ -71,7 +79,10 @@ int main(void) {
 
     // Close read end
     printf("[5] Closing read descriptor pipefd[0]...\n");
-    close(pipefd[0]);
+    if (close(pipefd[0]) == -1) {
+        perror("close read end failed");
+        return EXIT_FAILURE;
+    }
 
     printf("====================================================\n");
     printf("  Pipe communication completed and cleaned up.\n");
@@ -79,4 +90,3 @@ int main(void) {
 
     return EXIT_SUCCESS;
 }
-

@@ -5,7 +5,7 @@
  * Concepts Demonstrated:
  *  - Creating or truncating files using fopen() with mode "w"
  *  - Formatted file stream output via fprintf() and fputs()
- *  - Stream buffer flushing and graceful closure using fclose()
+ *  - Checking write errors and graceful stream closure using fclose()
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -22,12 +22,16 @@ int main(int argc, char *argv[]) {
     const char *filepath = NULL;
 
     if (argc > 1) {
+        if (argv[1][0] == '\0') {
+            fprintf(stderr, "[Error] Output file path cannot be empty.\n");
+            return EXIT_FAILURE;
+        }
         filepath = argv[1];
     } else {
         struct stat st;
-        if (stat("class_work/file_handling", &st) == 0) {
+        if (stat("class_work/file_handling", &st) == 0 && S_ISDIR(st.st_mode)) {
             filepath = "class_work/file_handling/demo_output.txt";
-        } else if (stat("OS-C-Programming-Lab/class_work/file_handling", &st) == 0) {
+        } else if (stat("OS-C-Programming-Lab/class_work/file_handling", &st) == 0 && S_ISDIR(st.st_mode)) {
             filepath = "OS-C-Programming-Lab/class_work/file_handling/demo_output.txt";
         } else {
             filepath = "demo_output.txt";
@@ -47,15 +51,17 @@ int main(int argc, char *argv[]) {
 
     printf("[2] Writing records to file stream...\n");
 
-    fputs("# Operating Systems Lab Records\n", file);
-    fputs("----------------------------------------\n", file);
-
-    // Formatted output
-    fprintf(file, "Process ID  : %d\n", 1001);
-    fprintf(file, "Module Name : %s\n", "Process Scheduler Simulation");
-    fprintf(file, "Execution   : Successful\n");
-    fprintf(file, "CPU Slices  : %d\n", 4);
-    fprintf(file, "----------------------------------------\n");
+    if (fputs("# Operating Systems Lab Records\n", file) == EOF ||
+        fputs("----------------------------------------\n", file) == EOF ||
+        fprintf(file, "Process ID  : %d\n", 1001) < 0 ||
+        fprintf(file, "Module Name : %s\n", "Process Scheduler Simulation") < 0 ||
+        fprintf(file, "Execution   : Successful\n") < 0 ||
+        fprintf(file, "CPU Slices  : %d\n", 4) < 0 ||
+        fprintf(file, "----------------------------------------\n") < 0) {
+        perror("[Error] Failed while writing to file");
+        fclose(file);
+        return EXIT_FAILURE;
+    }
 
     printf("    Records written successfully.\n\n");
 

@@ -15,9 +15,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <unistd.h>
+#include <time.h>
 
 #define BUFFER_SIZE 5
 #define TOTAL_ITEMS 10
@@ -37,29 +38,51 @@ static sem_t empty_slots;
 static sem_t full_slots;
 static pthread_mutex_t buffer_mutex;
 
+static void sleep_ms(long milliseconds) {
+    struct timespec ts;
+    ts.tv_sec = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000L;
+    nanosleep(&ts, NULL);
+}
+
 // Producer Thread Routine
 void *producer(void *arg) {
     int producer_id = *(int *)arg;
 
     for (int i = 0; i < ITEMS_PER_PRODUCER; i++) {
         // Wait for an empty slot in buffer
-        sem_wait(&empty_slots);
+        if (sem_wait(&empty_slots) != 0) {
+            perror("producer sem_wait failed");
+            return NULL;
+        }
 
         // LOCK MUTEX to update buffer state
-        pthread_mutex_lock(&buffer_mutex);
+        int rc = pthread_mutex_lock(&buffer_mutex);
+        if (rc != 0) {
+            fprintf(stderr, "producer mutex_lock failed: %s\n", strerror(rc));
+            sem_post(&empty_slots);
+            return NULL;
+        }
 
         int item = item_counter++;
         buffer[in] = item;
-        printf("  [Producer %d] Produced Item %02d -> Buffer Slot [%d]\n", 
+        printf("  [Producer %d] Produced Item %02d -> Buffer Slot [%d]\n",
                producer_id, item, in);
         in = (in + 1) % BUFFER_SIZE;
 
-        pthread_mutex_unlock(&buffer_mutex);
+        rc = pthread_mutex_unlock(&buffer_mutex);
+        if (rc != 0) {
+            fprintf(stderr, "producer mutex_unlock failed: %s\n", strerror(rc));
+            return NULL;
+        }
 
         // Signal that a full slot is available
-        sem_post(&full_slots);
+        if (sem_post(&full_slots) != 0) {
+            perror("producer sem_post failed");
+            return NULL;
+        }
 
-        usleep(80000); // 80 ms
+        sleep_ms(80);
     }
 
     return NULL;
@@ -71,22 +94,37 @@ void *consumer(void *arg) {
 
     for (int i = 0; i < ITEMS_PER_CONSUMER; i++) {
         // Wait for a full slot in buffer
-        sem_wait(&full_slots);
+        if (sem_wait(&full_slots) != 0) {
+            perror("consumer sem_wait failed");
+            return NULL;
+        }
 
         // LOCK MUTEX to consume from buffer
-        pthread_mutex_lock(&buffer_mutex);
+        int rc = pthread_mutex_lock(&buffer_mutex);
+        if (rc != 0) {
+            fprintf(stderr, "consumer mutex_lock failed: %s\n", strerror(rc));
+            sem_post(&full_slots);
+            return NULL;
+        }
 
         int item = buffer[out];
-        printf("    [Consumer %d] Consumed Item %02d <- Buffer Slot [%d]\n", 
+        printf("    [Consumer %d] Consumed Item %02d <- Buffer Slot [%d]\n",
                consumer_id, item, out);
         out = (out + 1) % BUFFER_SIZE;
 
-        pthread_mutex_unlock(&buffer_mutex);
+        rc = pthread_mutex_unlock(&buffer_mutex);
+        if (rc != 0) {
+            fprintf(stderr, "consumer mutex_unlock failed: %s\n", strerror(rc));
+            return NULL;
+        }
 
         // Signal that an empty slot is now available
-        sem_post(&empty_slots);
+        if (sem_post(&empty_slots) != 0) {
+            perror("consumer sem_post failed");
+            return NULL;
+        }
 
-        usleep(120000); // 120 ms
+        sleep_ms(120);
     }
 
     return NULL;
@@ -100,7 +138,6 @@ int main(void) {
     printf("[Init] Buffer Size = %d, Total Items = %d\n", BUFFER_SIZE, TOTAL_ITEMS);
     printf("[Init] Producers = %d, Consumers = %d\n\n", NUM_PRODUCERS, NUM_CONSUMERS);
 
-    // Initialize semaphores
     // empty_slots starts at BUFFER_SIZE (all slots free)
     if (sem_init(&empty_slots, 0, BUFFER_SIZE) != 0) {
         perror("sem_init empty_slots failed");
@@ -115,8 +152,9 @@ int main(void) {
     }
 
     // Initialize buffer protection mutex
-    if (pthread_mutex_init(&buffer_mutex, NULL) != 0) {
-        perror("pthread_mutex_init failed");
+    int rc = pthread_mutex_init(&buffer_mutex, NULL);
+    if (rc != 0) {
+        fprintf(stderr, "pthread_mutex_init failed: %s\n", strerror(rc));
         sem_destroy(&empty_slots);
         sem_destroy(&full_slots);
         return EXIT_FAILURE;
@@ -126,36 +164,71 @@ int main(void) {
     pthread_t cons_threads[NUM_CONSUMERS];
     int prod_ids[NUM_PRODUCERS];
     int cons_ids[NUM_CONSUMERS];
+    int prod_created = 0;
+    int cons_created = 0;
+    int status = EXIT_SUCCESS;
 
     // Spawn producer threads
     for (int i = 0; i < NUM_PRODUCERS; i++) {
         prod_ids[i] = i + 1;
-        pthread_create(&prod_threads[i], NULL, producer, &prod_ids[i]);
+        rc = pthread_create(&prod_threads[i], NULL, producer, &prod_ids[i]);
+        if (rc != 0) {
+            fprintf(stderr, "Failed to create producer %d: %s\n", i + 1, strerror(rc));
+            status = EXIT_FAILURE;
+            break;
+        }
+        prod_created++;
     }
 
-    // Spawn consumer threads
-    for (int i = 0; i < NUM_CONSUMERS; i++) {
-        cons_ids[i] = i + 1;
-        pthread_create(&cons_threads[i], NULL, consumer, &cons_ids[i]);
+    // Spawn consumer threads only if all producers started
+    if (status == EXIT_SUCCESS) {
+        for (int i = 0; i < NUM_CONSUMERS; i++) {
+            cons_ids[i] = i + 1;
+            rc = pthread_create(&cons_threads[i], NULL, consumer, &cons_ids[i]);
+            if (rc != 0) {
+                fprintf(stderr, "Failed to create consumer %d: %s\n", i + 1, strerror(rc));
+                status = EXIT_FAILURE;
+                break;
+            }
+            cons_created++;
+        }
     }
 
-    // Wait for all threads to finish
-    for (int i = 0; i < NUM_PRODUCERS; i++) {
-        pthread_join(prod_threads[i], NULL);
+    // Wait for created threads to finish
+    for (int i = 0; i < prod_created; i++) {
+        rc = pthread_join(prod_threads[i], NULL);
+        if (rc != 0) {
+            fprintf(stderr, "Failed to join producer %d: %s\n", i + 1, strerror(rc));
+            status = EXIT_FAILURE;
+        }
     }
-    for (int i = 0; i < NUM_CONSUMERS; i++) {
-        pthread_join(cons_threads[i], NULL);
+    for (int i = 0; i < cons_created; i++) {
+        rc = pthread_join(cons_threads[i], NULL);
+        if (rc != 0) {
+            fprintf(stderr, "Failed to join consumer %d: %s\n", i + 1, strerror(rc));
+            status = EXIT_FAILURE;
+        }
     }
 
     // Clean up synchronization primitives
-    pthread_mutex_destroy(&buffer_mutex);
-    sem_destroy(&empty_slots);
-    sem_destroy(&full_slots);
+    if (pthread_mutex_destroy(&buffer_mutex) != 0) {
+        perror("pthread_mutex_destroy failed");
+        status = EXIT_FAILURE;
+    }
+    if (sem_destroy(&empty_slots) != 0) {
+        perror("sem_destroy empty_slots failed");
+        status = EXIT_FAILURE;
+    }
+    if (sem_destroy(&full_slots) != 0) {
+        perror("sem_destroy full_slots failed");
+        status = EXIT_FAILURE;
+    }
 
-    printf("\n[Cleanup] All %d items successfully produced and consumed.\n", TOTAL_ITEMS);
-    printf("[Cleanup] Mutex and Semaphores destroyed safely.\n");
+    if (status == EXIT_SUCCESS) {
+        printf("\n[Cleanup] All %d items successfully produced and consumed.\n", TOTAL_ITEMS);
+        printf("[Cleanup] Mutex and Semaphores destroyed safely.\n");
+    }
     printf("====================================================\n");
 
-    return EXIT_SUCCESS;
+    return status;
 }
-

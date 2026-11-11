@@ -5,7 +5,7 @@
  * Concepts Demonstrated:
  *  - Standard C buffered I/O stream (FILE*)
  *  - Defensive handling of non-existent or inaccessible files
- *  - Sequential line-by-line reading using fgets()
+ *  - Sequential line-by-line reading using fgets() and ferror() verification
  *  - Safe stream closure via fclose()
  */
 
@@ -23,6 +23,10 @@ int main(int argc, char *argv[]) {
     const char *filepath = NULL;
 
     if (argc > 1) {
+        if (argv[1][0] == '\0') {
+            fprintf(stderr, "[Error] File path argument cannot be empty.\n");
+            return EXIT_FAILURE;
+        }
         filepath = argv[1];
     } else {
         // Check relative paths from inside OS-C-Programming-Lab or from parent dir
@@ -64,6 +68,12 @@ int main(int argc, char *argv[]) {
         if (len > 0 && buffer[len - 1] != '\n') {
             printf("\n");
         }
+    }
+
+    if (ferror(file)) {
+        perror("[Error] I/O error occurred while reading file");
+        fclose(file);
+        return EXIT_FAILURE;
     }
 
     printf("-------------------------------------------------------\n\n");

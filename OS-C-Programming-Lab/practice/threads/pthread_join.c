@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include <unistd.h>
+#include <time.h>
 
 #define NUM_THREADS 4
 
@@ -24,6 +24,13 @@ typedef struct {
     int range_start;
     int range_end;
 } WorkerTask;
+
+static void sleep_ms(long milliseconds) {
+    struct timespec ts;
+    ts.tv_sec = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000L;
+    nanosleep(&ts, NULL);
+}
 
 // Worker routine: calculates sum of integers in [range_start, range_end]
 void *calculate_sum(void *arg) {
@@ -37,8 +44,8 @@ void *calculate_sum(void *arg) {
         partial_sum += i;
     }
 
-    // Small delay to simulate varied completion timing
-    usleep(50000);
+    // Small delay to simulate varied completion timing (POSIX.1-2008 nanosleep)
+    sleep_ms(50);
 
     // Allocate return memory for the result
     long *result = malloc(sizeof(long));
@@ -64,6 +71,7 @@ int main(void) {
     int slice_size = 25;
     printf("[Main] Spawning %d worker threads to sum numbers 1 through 100...\n", NUM_THREADS);
 
+    int created_count = 0;
     for (int i = 0; i < NUM_THREADS; i++) {
         tasks[i].thread_id = i + 1;
         tasks[i].range_start = (i * slice_size) + 1;
@@ -72,8 +80,15 @@ int main(void) {
         int rc = pthread_create(&threads[i], NULL, calculate_sum, (void *)&tasks[i]);
         if (rc != 0) {
             fprintf(stderr, "Failed to create thread %d: %s\n", i, strerror(rc));
+            for (int j = 0; j < created_count; j++) {
+                void *cleanup_res = NULL;
+                if (pthread_join(threads[j], &cleanup_res) == 0) {
+                    free(cleanup_res);
+                }
+            }
             return EXIT_FAILURE;
         }
+        created_count++;
     }
 
     printf("[Main] All %d threads dispatched. Awaiting completion...\n\n", NUM_THREADS);
@@ -103,4 +118,3 @@ int main(void) {
 
     return EXIT_SUCCESS;
 }
-
