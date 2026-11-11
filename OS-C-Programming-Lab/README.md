@@ -284,10 +284,22 @@ The smoke test runs every binary in non-interactive verification mode, tests int
 
 ## Linux Compatibility & Platform Notes
 
-- **Native Linux:** Fully compatible out of the box with any modern Linux distribution.
+- **Native Linux:** Target environment — fully compatible out of the box with any modern Linux distribution (`make all && make test`).
 - **Windows (WSL2):** Recommended for Windows users. WSL2 runs a genuine Linux kernel, offering native support for POSIX system calls (`fork`, `wait`, `pipe`, `shm_open`, `mmap`).
-- **Windows MinGW/MSYS2:** Standard C programs (dynamic memory, file handling, CPU scheduling) compile under MinGW. However, POSIX process calls (`fork()`, POSIX unnamed semaphores, `shm_open`) are POSIX-specific and require WSL2 or a Linux environment.
+- **Windows MinGW/MSYS2:** Standard C programs (dynamic memory, file handling, CPU scheduling) and MinGW `winpthreads` programs (threads, mutexes, unnamed semaphores) compile and run under MSYS2 MinGW64 (`gcc -std=c11 -Wall -Wextra -Wpedantic -Werror`). However, POSIX process/IPC calls (`fork()`, `wait()`, `pipe()`, `shm_open()`, `mmap()`) require Linux or WSL2.
 - **macOS:** BSD-based macOS supports `fork()`, `pipe()`, `pthreads`, and `mmap()`. Note that macOS has deprecated unnamed semaphores (`sem_init()`) in favor of named semaphores (`sem_open()`). For standard POSIX unnamed semaphore testing, Linux is the target environment.
+
+### Verification Status
+
+- **Verified on Windows MSYS2 MinGW64 (`gcc 16.1.0 -std=c11 -Wall -Wextra -Wpedantic -Werror`):**
+  - Compiled and executed cleanly: `malloc_example.c`, `calloc_example.c`, `realloc_example.c`, `file_write.c`, `file_append.c`, `file_read.c`, `fcfs.c`, `sjf.c`, `round_robin.c`, `memory_management.c`, `pthread_create.c`, `pthread_join.c`, `mutex_counter.c`, `semaphore_example.c`, `producer_consumer.c`, `thread_synchronization.c`.
+  - Negative/invalid-input checks verified: missing file in `file_read`, invalid CLI flag and invalid `--custom` input in `fcfs`/`sjf`/`round_robin`.
+- **Requires Linux / WSL2 Runtime Verification (`make all && make test`):**
+  - `practice/process_creation/fork_example.c` and `fork_wait.c`
+  - `class_work/pipes/basic_pipe.c` and `parent_child_pipe.c`
+  - `assignments/shared_memory/shared_memory_write.c` and `shared_memory_read.c`
+  - `final_examples/process_communication.c`
+  - Full `Makefile` and `scripts/smoke_test.sh` execution (WSL and `make` were not available on the Windows authoring host).
 
 ---
 

@@ -132,12 +132,12 @@ test: all
 	@chmod +x scripts/smoke_test.sh
 	@./scripts/smoke_test.sh
 
-# Clean build artifacts
+# Clean build artifacts (preserve sample_input.txt)
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf $(BUILD_DIR)/*
 	@touch $(BUILD_DIR)/.gitkeep
-	@rm -f class_work/file_handling/*.txt
+	@rm -f class_work/file_handling/demo_output.txt
 	@echo "[OK] Clean complete."
 
 # ------------------------------------------------------------------------------
