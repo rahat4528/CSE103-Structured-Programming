@@ -175,3 +175,28 @@ int sem_destroy(sem_t *sem);
 - **`pshared` parameter:** Pass `0` for intra-process thread synchronization.
 - **`value` parameter:** Initial permit count.
 
+---
+
+## 6. POSIX Utilities & Standard C Stream APIs
+
+### `nanosleep` (POSIX.1-2008)
+```c
+#include <time.h>
+
+int nanosleep(const struct timespec *req, struct timespec *rem);
+```
+- **Description:** Suspends execution of the calling thread for the interval specified in `req` (replaces obsolete `usleep()` under strict `_POSIX_C_SOURCE >= 200809L`).
+
+### `fstat`
+```c
+#include <sys/stat.h>
+
+int fstat(int fd, struct stat *statbuf);
+```
+- **Description:** Queries metadata (such as `st_size` in bytes) for an already open file or shared memory descriptor.
+
+### Standard C Buffered Streams (`<stdio.h>`)
+- `fopen(path, mode)` / `fclose(stream)`: Open and flush/close buffered `FILE*` streams.
+- `fgets(buf, size, stream)` / `fprintf(stream, fmt, ...)`: Line-safe text reading and formatted output.
+- `fread(ptr, size, nmemb, stream)` / `fwrite(ptr, size, nmemb, stream)`: Fixed-block buffered I/O returning the number of items transferred.
+

@@ -10,6 +10,8 @@
 
 #define _POSIX_C_SOURCE 200809L
 
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +33,46 @@ typedef struct {
     int pid;
     int end_time;
 } GanttSlice;
+
+/* Safe line-based integer parser using fgets() + strtol() (rejects trailing garbage). */
+static int read_int_in_range(const char *prompt, int min_val, int max_val, int *out_val) {
+    char line[64];
+    printf("%s", prompt);
+    if (fgets(line, sizeof(line), stdin) == NULL) {
+        return 0;
+    }
+
+    size_t len = strlen(line);
+    if (len > 0 && line[len - 1] != '\n' && !feof(stdin)) {
+        int ch;
+        while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return 0;
+    }
+
+    char *start = line;
+    while (*start && isspace((unsigned char)*start)) {
+        start++;
+    }
+    if (*start == '\0') {
+        return 0;
+    }
+
+    char *endptr = NULL;
+    errno = 0;
+    long val = strtol(start, &endptr, 10);
+    if (errno != 0 || endptr == start) {
+        return 0;
+    }
+    while (*endptr && isspace((unsigned char)*endptr)) {
+        endptr++;
+    }
+    if (*endptr != '\0' || val < min_val || val > max_val) {
+        return 0;
+    }
+
+    *out_val = (int)val;
+    return 1;
+}
 
 int main(int argc, char *argv[]) {
     printf("====================================================\n");
@@ -66,23 +108,24 @@ int main(int argc, char *argv[]) {
         proc[2] = (Process){.pid = 3, .burst_time = 7, .remaining_time = 7};
         proc[3] = (Process){.pid = 4, .burst_time = 3, .remaining_time = 3};
     } else {
-        printf("Enter number of processes (1 - %d): ", MAX_PROCESSES);
-        if (scanf("%d", &n) != 1 || n <= 0 || n > MAX_PROCESSES) {
+        char prompt[64];
+        snprintf(prompt, sizeof(prompt), "Enter number of processes (1 - %d): ", MAX_PROCESSES);
+        if (!read_int_in_range(prompt, 1, MAX_PROCESSES, &n)) {
             fprintf(stderr, "[Error] Invalid process count (must be 1 - %d).\n", MAX_PROCESSES);
             return EXIT_FAILURE;
         }
         for (int i = 0; i < n; i++) {
             proc[i].pid = i + 1;
-            printf("Enter Burst Time for Process P%d (1 - %d): ", proc[i].pid, MAX_BURST_TIME);
-            if (scanf("%d", &proc[i].burst_time) != 1 ||
-                proc[i].burst_time <= 0 || proc[i].burst_time > MAX_BURST_TIME) {
+            snprintf(prompt, sizeof(prompt), "Enter Burst Time for Process P%d (1 - %d): ",
+                     proc[i].pid, MAX_BURST_TIME);
+            if (!read_int_in_range(prompt, 1, MAX_BURST_TIME, &proc[i].burst_time)) {
                 fprintf(stderr, "[Error] Invalid burst time (must be 1 - %d).\n", MAX_BURST_TIME);
                 return EXIT_FAILURE;
             }
             proc[i].remaining_time = proc[i].burst_time;
         }
-        printf("Enter Time Quantum (1 - %d): ", MAX_BURST_TIME);
-        if (scanf("%d", &quantum) != 1 || quantum <= 0 || quantum > MAX_BURST_TIME) {
+        snprintf(prompt, sizeof(prompt), "Enter Time Quantum (1 - %d): ", MAX_BURST_TIME);
+        if (!read_int_in_range(prompt, 1, MAX_BURST_TIME, &quantum)) {
             fprintf(stderr, "[Error] Invalid quantum (must be 1 - %d).\n", MAX_BURST_TIME);
             return EXIT_FAILURE;
         }

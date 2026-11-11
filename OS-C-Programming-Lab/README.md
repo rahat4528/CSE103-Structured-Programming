@@ -211,10 +211,14 @@ make final_examples  # Builds Folder 06
 # 3. Verify all preparation and viva Markdown documents
 make prep
 
-# 4. Remove all compiled executables and test files
+# 4. Run sanitizer build or Valgrind leak checks (Linux)
+make sanitize
+make valgrind
+
+# 5. Remove all compiled executables and test files
 make clean
 
-# 5. Display help menu with all available targets
+# 6. Display help menu with all available targets
 make help
 ```
 
@@ -311,6 +315,15 @@ The smoke test runs every binary in non-interactive verification mode, tests int
 - [`docs/compilation_guide.md`](./docs/compilation_guide.md) — GCC flag reference, pthread linking guide, and WSL setup instructions.
 - [`docs/troubleshooting.md`](./docs/troubleshooting.md) — Debugging pipe deadlocks, stale shared memory, and segmentation faults.
 - [`prep/`](./prep/) — Dedicated exam and viva preparation guides covering processes, threads, memory, synchronization, and scheduling.
+
+---
+
+## Related CSE103 Reference Material
+
+This laboratory lives inside the broader [CSE103 Structured Programming](../README.md) repository and aligns its C engineering practices with sibling modules without duplicating them:
+- **[`../Railway-Management-System`](../Railway-Management-System)** & **[`../c-blood-group-management`](../c-blood-group-management):** Share defensive line-based `fgets()` + `strtol()` input parsing, buffered `fread()`/`fwrite()` operations, atomic `.tmp` $\to$ `rename()` persistence patterns, and `sanitize`/`valgrind` Makefile diagnostics.
+- **[`../c-atm-simulation`](../c-atm-simulation):** Explores dynamic `malloc`/`realloc`/`free` arrays and transactional audit logging in C11 (mirrored at the concurrency layer in `final_examples/thread_synchronization.c`).
+- **[`../discrete mathematics`](../discrete%20mathematics):** Demonstrates multi-dimensional `int **` heap allocation and teardown timing (concepts summarized in `prep/memory_questions.md`).
 
 ---
 

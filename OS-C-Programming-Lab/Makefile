@@ -76,7 +76,7 @@ PREP_DOCS := \
 # ------------------------------------------------------------------------------
 # Phony Targets
 # ------------------------------------------------------------------------------
-.PHONY: all practice class_work assignments labs prep final_examples test clean help dirs
+.PHONY: all practice class_work assignments labs prep final_examples test sanitize valgrind clean help dirs
 
 # Default target
 all: dirs practice class_work assignments labs final_examples
@@ -131,6 +131,24 @@ test: all
 	@echo "Running automated smoke test suite..."
 	@chmod +x scripts/smoke_test.sh
 	@./scripts/smoke_test.sh
+
+# Build with AddressSanitizer + UndefinedBehaviorSanitizer (Linux/GCC diagnostic run)
+sanitize: CFLAGS += -fsanitize=address,undefined -g -O1
+sanitize: clean all
+	@echo "[OK] Sanitizer-instrumented binaries built in '$(BUILD_DIR)/'."
+	@echo "Run individual programs or './scripts/smoke_test.sh' to check for leaks and UB."
+
+# Run Valgrind leak checks on dynamic memory and thread synchronization binaries
+valgrind: all
+	@command -v valgrind >/dev/null 2>&1 || { echo "[ERROR] valgrind is not installed."; exit 1; }
+	@echo "Running Valgrind leak checks on memory and synchronization examples..."
+	@valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 $(BUILD_DIR)/practice/memory_allocation/malloc_example >/dev/null
+	@valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 $(BUILD_DIR)/practice/memory_allocation/calloc_example >/dev/null
+	@valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 $(BUILD_DIR)/practice/memory_allocation/realloc_example >/dev/null
+	@valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 $(BUILD_DIR)/final_examples/memory_management >/dev/null
+	@valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 $(BUILD_DIR)/practice/threads/pthread_join >/dev/null
+	@valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 $(BUILD_DIR)/final_examples/thread_synchronization >/dev/null
+	@echo "[OK] Valgrind leak checks passed with 0 leaks."
 
 # Clean build artifacts (preserve sample_input.txt)
 clean:
@@ -226,6 +244,8 @@ help:
 	@echo "  make prep         - Verify Folder 05: Exam & Viva Markdown guides"
 	@echo "  make final_examples - Build Folder 06: Combined integration programs"
 	@echo "  make test         - Run automated smoke test suite (scripts/smoke_test.sh)"
+	@echo "  make sanitize     - Build binaries with AddressSanitizer & UBSan (-fsanitize=address,undefined)"
+	@echo "  make valgrind     - Run Valgrind memory-leak checks on memory & thread targets"
 	@echo "  make clean        - Remove all compiled binaries from build/"
 	@echo "  make help         - Display this help information"
 	@echo ""

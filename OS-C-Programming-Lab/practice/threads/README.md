@@ -64,11 +64,12 @@ This folder covers multithreading principles, POSIX thread creation, parameter p
   - `<stdlib.h>`
   - `<string.h>`
   - `<pthread.h>`
-  - `<unistd.h>`
+  - `<time.h>`: POSIX.1-2008 `nanosleep()` timing helper.
 - **Important Functions:**
   - `pthread_create()`: Spawns worker threads.
   - `pthread_join()`: Blocks until target terminates and captures its returned `void*` pointer.
   - `pthread_exit()`: Terminates calling thread and returns a status pointer.
+  - `nanosleep()`: POSIX.1-2008 sub-second sleep helper.
   - `free()`: Deallocates dynamically allocated memory returned by threads.
 - **How It Works:**
   1. Main splits the range 1..100 into 4 slices: [1..25], [26..50], [51..75], and [76..100].

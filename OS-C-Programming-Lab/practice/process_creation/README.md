@@ -14,10 +14,12 @@ This folder covers foundational process creation, lifecycle management, and sync
   - `<stdlib.h>`: Memory management and process termination macros (`EXIT_SUCCESS`, `exit`).
   - `<unistd.h>`: POSIX API (`fork`, `getpid`, `getppid`, `sleep`).
   - `<sys/types.h>`: Type definitions such as `pid_t`.
+  - `<sys/wait.h>`: `waitpid()` to cleanly reap the child after parent demonstrates independence.
 - **Important Functions:**
   - `fork()`: Creates a new child process by duplicating the calling process.
   - `getpid()`: Returns the process ID of the calling process.
   - `getppid()`: Returns the process ID of the parent process.
+  - `waitpid()`: Reaps the child process at the end of parent execution to avoid zombie processes.
 - **How It Works:**
   1. The parent process initializes a local integer variable `shared_variable = 100`.
   2. `fork()` is invoked. The kernel creates a child process with a separate address space.

@@ -159,7 +159,10 @@ gcc $FLAGS final_examples/memory_management.c -o memory_management
 | `fopen(path, mode)` | `<stdio.h>` | Opens standard C buffered stream (`"r"`, `"w"`, `"a"`). |
 | `fclose(stream)` | `<stdio.h>` | Flushes buffer and closes stream. |
 | `fgets(s, sz, st)` | `<stdio.h>` | Safely reads string line until newline or EOF. |
+| `fread(p, sz, n, st)`| `<stdio.h>` | Reads buffered blocks of `n` items of `sz` bytes from stream. |
+| `fwrite(p, sz, n, st)`| `<stdio.h>`| Writes buffered blocks of `n` items of `sz` bytes to stream. |
 | `fprintf(st, ...)` | `<stdio.h>` | Formatted output to file stream. |
+| `strtol(s, &end, 10)`| `<stdlib.h>`| Overflow-checked base-10 integer parsing with trailing garbage detection. |
 
 ---
 
