@@ -22,6 +22,7 @@ int main(void) {
     printf("====================================================\n\n");
 
     printf("[Parent] PID %d is creating a child process...\n", (int)getpid());
+    fflush(stdout);
 
     pid_t pid = fork();
 
@@ -40,6 +41,7 @@ int main(void) {
 
         const int exit_code = 42;
         printf("  [Child] Terminating voluntarily with exit code %d.\n", exit_code);
+        fflush(stdout);
         exit(exit_code);
     } else {
         // Parent Process
@@ -72,4 +74,3 @@ int main(void) {
 
     return EXIT_SUCCESS;
 }
-

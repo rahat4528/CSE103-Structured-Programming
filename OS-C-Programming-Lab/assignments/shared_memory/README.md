@@ -103,6 +103,7 @@ POSIX shared memory objects persist in the kernel (`/dev/shm`) until explicitly 
   - `<sys/stat.h>`
 - **Important Functions:**
   - `shm_open(name, O_RDONLY, ...)`: Connects to existing object.
+  - `fstat(fd, &statbuf)`: Validates segment size (`>= sizeof(SharedData)`) before mapping to prevent `SIGBUS`.
   - `mmap(..., PROT_READ, MAP_SHARED, ...)`: Maps as read-only.
   - `munmap()`: Unmaps segment from caller address space.
   - `shm_unlink(name)`: Removes shared memory object name from `/dev/shm`.

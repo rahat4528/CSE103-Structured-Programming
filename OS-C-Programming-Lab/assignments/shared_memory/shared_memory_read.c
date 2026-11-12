@@ -4,8 +4,9 @@
  *
  * Concepts Demonstrated:
  *  - Opening an existing POSIX shared memory object
+ *  - Verifying segment size via fstat() before mapping to avoid SIGBUS
  *  - Mapping shared segment into reader's address space via mmap()
- *  - Extracting shared structured payload
+ *  - Extracting shared structured payload safely
  *  - Unmapping memory using munmap() and unlinking object with shm_unlink()
  */
 
@@ -42,6 +43,20 @@ int main(void) {
     }
     printf("    Shared memory object located. Descriptor: %d\n\n", shm_fd);
 
+    // Verify segment size before mapping to prevent SIGBUS on empty/truncated objects
+    struct stat shm_stat;
+    if (fstat(shm_fd, &shm_stat) == -1) {
+        perror("[Error] fstat failed");
+        close(shm_fd);
+        return EXIT_FAILURE;
+    }
+    if ((size_t)shm_stat.st_size < shm_size) {
+        fprintf(stderr, "[Error] Shared memory object size (%lld bytes) is smaller than expected (%zu bytes).\n",
+                (long long)shm_stat.st_size, shm_size);
+        close(shm_fd);
+        return EXIT_FAILURE;
+    }
+
     printf("[2] Mapping shared memory segment as read-only via mmap()...\n");
     void *ptr = mmap(NULL, shm_size, PROT_READ, MAP_SHARED, shm_fd, 0);
     if (ptr == MAP_FAILED) {
@@ -52,19 +67,24 @@ int main(void) {
     printf("    Mapped at virtual address: %p\n\n", ptr);
 
     printf("[3] Reading payload from shared memory:\n");
-    SharedData *data = (SharedData *)ptr;
+    const SharedData *data = (const SharedData *)ptr;
     printf("---------------- SHARED MEMORY DATA ----------------\n");
     printf("  Original Sender PID : %d\n", data->sender_pid);
     printf("  Message Sequence ID : %d\n", data->message_id);
-    printf("  Transmitted Text    : \"%s\"\n", data->text);
+    printf("  Transmitted Text    : \"%.*s\"\n", (int)sizeof(data->text) - 1, data->text);
     printf("----------------------------------------------------\n\n");
 
     printf("[4] Unmapping memory with munmap()...\n");
     if (munmap(ptr, shm_size) == -1) {
         perror("[Error] munmap failed");
+        close(shm_fd);
+        return EXIT_FAILURE;
     }
 
-    close(shm_fd);
+    if (close(shm_fd) == -1) {
+        perror("[Error] close failed");
+        return EXIT_FAILURE;
+    }
 
     printf("[5] Cleaning up shared memory object with shm_unlink()...\n");
     if (shm_unlink(SHM_NAME) == -1) {
@@ -78,4 +98,3 @@ int main(void) {
 
     return EXIT_SUCCESS;
 }
-

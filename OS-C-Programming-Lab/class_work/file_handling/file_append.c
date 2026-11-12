@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <sys/stat.h>
 
@@ -23,12 +24,16 @@ int main(int argc, char *argv[]) {
     const char *filepath = NULL;
 
     if (argc > 1) {
+        if (argv[1][0] == '\0') {
+            fprintf(stderr, "[Error] File path cannot be empty.\n");
+            return EXIT_FAILURE;
+        }
         filepath = argv[1];
     } else {
         struct stat st;
-        if (stat("class_work/file_handling", &st) == 0) {
+        if (stat("class_work/file_handling", &st) == 0 && S_ISDIR(st.st_mode)) {
             filepath = "class_work/file_handling/demo_output.txt";
-        } else if (stat("OS-C-Programming-Lab/class_work/file_handling", &st) == 0) {
+        } else if (stat("OS-C-Programming-Lab/class_work/file_handling", &st) == 0 && S_ISDIR(st.st_mode)) {
             filepath = "OS-C-Programming-Lab/class_work/file_handling/demo_output.txt";
         } else {
             filepath = "demo_output.txt";
@@ -43,7 +48,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // Generate a simple timestamp or sequence entry
+    // Generate a formatted timestamp
     time_t now = time(NULL);
     char time_str[32];
     struct tm *tm_info = localtime(&now);
@@ -54,7 +59,11 @@ int main(int argc, char *argv[]) {
     }
 
     printf("[2] Appending new log entry to \"%s\"...\n", filepath);
-    fprintf(file, "[LOG ENTRY] Timestamp: %s | Action: Appending new OS record\n", time_str);
+    if (fprintf(file, "[LOG ENTRY] Timestamp: %s | Action: Appending new OS record\n", time_str) < 0) {
+        perror("[Error] fprintf failed");
+        fclose(file);
+        return EXIT_FAILURE;
+    }
 
     if (fclose(file) != 0) {
         perror("[Error] fclose failed");
@@ -66,16 +75,28 @@ int main(int argc, char *argv[]) {
     printf("---------------- UPDATED FILE CONTENTS ----------------\n");
 
     FILE *verify_file = fopen(filepath, "r");
-    if (verify_file != NULL) {
-        char buffer[256];
-        int line_no = 1;
-        while (fgets(buffer, sizeof(buffer), verify_file) != NULL) {
-            printf("  [%02d] %s", line_no++, buffer);
-        }
-        fclose(verify_file);
-    } else {
+    if (verify_file == NULL) {
         perror("Unable to reopen file for verification");
+        return EXIT_FAILURE;
     }
+
+    char buffer[256];
+    int line_no = 1;
+    while (fgets(buffer, sizeof(buffer), verify_file) != NULL) {
+        printf("  [%02d] %s", line_no++, buffer);
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len - 1] != '\n') {
+            printf("\n");
+        }
+    }
+
+    if (ferror(verify_file)) {
+        perror("[Error] Failed while reading back file");
+        fclose(verify_file);
+        return EXIT_FAILURE;
+    }
+
+    fclose(verify_file);
     printf("-------------------------------------------------------\n");
     printf("====================================================\n");
 

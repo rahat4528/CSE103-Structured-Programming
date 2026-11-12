@@ -6,7 +6,7 @@
  *  - Creating or opening a POSIX shared memory object using shm_open()
  *  - Setting segment size using ftruncate()
  *  - Mapping shared memory into the process address space with mmap()
- *  - Writing structured inter-process communication data
+ *  - Zeroing memory and writing structured inter-process communication data
  *  - Unmapping memory using munmap() and closing descriptors
  */
 
@@ -21,7 +21,7 @@
 #include <sys/stat.h>
 
 #define SHM_NAME "/os_c_shm_demo"
-#define MESSAGE_TEXT "Inter-Process Communication via Linux POSIX Shared Memory!"
+#define DEFAULT_MESSAGE "Inter-Process Communication via Linux POSIX Shared Memory!"
 
 typedef struct {
     int sender_pid;
@@ -29,10 +29,19 @@ typedef struct {
     char text[128];
 } SharedData;
 
-int main(void) {
+int main(int argc, char *argv[]) {
     printf("====================================================\n");
     printf("       POSIX Shared Memory Writer: shm_open()       \n");
     printf("====================================================\n\n");
+
+    const char *payload_msg = DEFAULT_MESSAGE;
+    if (argc > 1) {
+        if (argv[1][0] == '\0') {
+            fprintf(stderr, "[Error] Message argument cannot be empty.\n");
+            return EXIT_FAILURE;
+        }
+        payload_msg = argv[1];
+    }
 
     const size_t shm_size = sizeof(SharedData);
     printf("[1] Creating / opening shared memory object: \"%s\"...\n", SHM_NAME);
@@ -64,11 +73,14 @@ int main(void) {
     }
     printf("    Memory mapped at virtual address: %p\n\n", ptr);
 
-    printf("[4] Writing structured data into shared memory...\n");
+    printf("[4] Zero-initializing segment and writing structured data...\n");
+    // Clear any stale bytes before writing fresh data
+    memset(ptr, 0, shm_size);
+
     SharedData *data = (SharedData *)ptr;
     data->sender_pid = (int)getpid();
     data->message_id = 101;
-    strncpy(data->text, MESSAGE_TEXT, sizeof(data->text) - 1);
+    strncpy(data->text, payload_msg, sizeof(data->text) - 1);
     data->text[sizeof(data->text) - 1] = '\0';
 
     printf("    Sender PID : %d\n", data->sender_pid);
@@ -78,10 +90,15 @@ int main(void) {
     printf("[5] Synchronizing and unmapping with munmap()...\n");
     if (munmap(ptr, shm_size) == -1) {
         perror("[Error] munmap failed");
+        close(shm_fd);
+        return EXIT_FAILURE;
     }
 
     // Close the file descriptor (shared memory persists in kernel)
-    close(shm_fd);
+    if (close(shm_fd) == -1) {
+        perror("[Error] close failed");
+        return EXIT_FAILURE;
+    }
 
     printf("    File descriptor closed. Shared memory object remains resident in /dev/shm.\n");
     printf("\n>>> NEXT STEP: Run 'shared_memory_read' to inspect and unlink this object.\n");
@@ -89,4 +106,3 @@ int main(void) {
 
     return EXIT_SUCCESS;
 }
-

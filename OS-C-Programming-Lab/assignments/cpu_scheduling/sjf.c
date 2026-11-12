@@ -10,11 +10,14 @@
 
 #define _POSIX_C_SOURCE 200809L
 
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define MAX_PROCESSES 10
+#define MAX_BURST_TIME 10000
 
 typedef struct {
     int pid;
@@ -24,11 +27,54 @@ typedef struct {
     int waiting_time;
 } Process;
 
-// Comparator to sort processes ascending by burst time
-int compare_burst(const void *a, const void *b) {
+/* Safe line-based integer parser using fgets() + strtol() (rejects trailing garbage). */
+static int read_int_in_range(const char *prompt, int min_val, int max_val, int *out_val) {
+    char line[64];
+    printf("%s", prompt);
+    if (fgets(line, sizeof(line), stdin) == NULL) {
+        return 0;
+    }
+
+    size_t len = strlen(line);
+    if (len > 0 && line[len - 1] != '\n' && !feof(stdin)) {
+        int ch;
+        while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return 0;
+    }
+
+    char *start = line;
+    while (*start && isspace((unsigned char)*start)) {
+        start++;
+    }
+    if (*start == '\0') {
+        return 0;
+    }
+
+    char *endptr = NULL;
+    errno = 0;
+    long val = strtol(start, &endptr, 10);
+    if (errno != 0 || endptr == start) {
+        return 0;
+    }
+    while (*endptr && isspace((unsigned char)*endptr)) {
+        endptr++;
+    }
+    if (*endptr != '\0' || val < min_val || val > max_val) {
+        return 0;
+    }
+
+    *out_val = (int)val;
+    return 1;
+}
+
+// Overflow-safe comparator sorting ascending by burst time (ties broken by PID)
+static int compare_burst(const void *a, const void *b) {
     const Process *p1 = (const Process *)a;
     const Process *p2 = (const Process *)b;
-    return (p1->burst_time - p2->burst_time);
+    if (p1->burst_time != p2->burst_time) {
+        return (p1->burst_time > p2->burst_time) - (p1->burst_time < p2->burst_time);
+    }
+    return (p1->pid > p2->pid) - (p1->pid < p2->pid);
 }
 
 int main(int argc, char *argv[]) {
@@ -37,13 +83,24 @@ int main(int argc, char *argv[]) {
     printf("====================================================\n");
     printf("[Note] Educational model. All processes arrive at time t = 0.\n\n");
 
+    int use_default = 1;
+    if (argc > 1) {
+        if (strcmp(argv[1], "--custom") == 0) {
+            use_default = 0;
+        } else if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+            printf("Usage: %s [--custom | --help]\n", argv[0]);
+            printf("  (no args) : Run verified benchmark dataset (P1=6, P2=8, P3=7, P4=3)\n");
+            printf("  --custom  : Prompt for custom process count and burst times\n");
+            return EXIT_SUCCESS;
+        } else {
+            fprintf(stderr, "[Error] Unknown option: %s\n", argv[1]);
+            fprintf(stderr, "Usage: %s [--custom | --help]\n", argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+
     int n = 4;
     Process proc[MAX_PROCESSES];
-
-    int use_default = 1;
-    if (argc > 1 && strcmp(argv[1], "--custom") == 0) {
-        use_default = 0;
-    }
 
     if (use_default) {
         printf("[Mode] Running with standard educational test dataset:\n");
@@ -52,23 +109,25 @@ int main(int argc, char *argv[]) {
         proc[2] = (Process){.pid = 3, .burst_time = 7};
         proc[3] = (Process){.pid = 4, .burst_time = 3};
     } else {
-        printf("Enter number of processes (1 - %d): ", MAX_PROCESSES);
-        if (scanf("%d", &n) != 1 || n <= 0 || n > MAX_PROCESSES) {
-            fprintf(stderr, "Invalid process count.\n");
+        char prompt[64];
+        snprintf(prompt, sizeof(prompt), "Enter number of processes (1 - %d): ", MAX_PROCESSES);
+        if (!read_int_in_range(prompt, 1, MAX_PROCESSES, &n)) {
+            fprintf(stderr, "[Error] Invalid process count (must be 1 - %d).\n", MAX_PROCESSES);
             return EXIT_FAILURE;
         }
         for (int i = 0; i < n; i++) {
             proc[i].pid = i + 1;
-            printf("Enter Burst Time for Process P%d: ", proc[i].pid);
-            if (scanf("%d", &proc[i].burst_time) != 1 || proc[i].burst_time <= 0) {
-                fprintf(stderr, "Invalid burst time.\n");
+            snprintf(prompt, sizeof(prompt), "Enter Burst Time for Process P%d (1 - %d): ",
+                     proc[i].pid, MAX_BURST_TIME);
+            if (!read_int_in_range(prompt, 1, MAX_BURST_TIME, &proc[i].burst_time)) {
+                fprintf(stderr, "[Error] Invalid burst time (must be 1 - %d).\n", MAX_BURST_TIME);
                 return EXIT_FAILURE;
             }
         }
     }
 
     // Sort by burst time for SJF
-    qsort(proc, n, sizeof(Process), compare_burst);
+    qsort(proc, (size_t)n, sizeof(Process), compare_burst);
 
     int current_time = 0;
     double total_wt = 0.0;
@@ -91,7 +150,7 @@ int main(int argc, char *argv[]) {
     }
     printf("\n0");
     for (int i = 0; i < n; i++) {
-        printf("        %2d", proc[i].completion_time);
+        printf("       %2d", proc[i].completion_time);
     }
     printf("\n\n");
 
@@ -112,4 +171,3 @@ int main(int argc, char *argv[]) {
 
     return EXIT_SUCCESS;
 }
-

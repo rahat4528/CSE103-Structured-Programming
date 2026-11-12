@@ -94,6 +94,7 @@ This folder covers unidirectional Inter-Process Communication (IPC) in Linux usi
   gcc -std=c11 -Wall -Wextra -Wpedantic class_work/pipes/parent_child_pipe.c -o build/class_work/pipes/parent_child_pipe
   ```
 - **Execution Command:**
+  ```bash
   ./build/class_work/pipes/parent_child_pipe
   ```
 - **Expected Output:**

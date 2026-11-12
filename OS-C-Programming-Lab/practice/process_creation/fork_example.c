@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 int main(void) {
     printf("====================================================\n");
@@ -27,6 +28,9 @@ int main(void) {
     printf("  shared_variable    : %d (Address: %p)\n\n", shared_variable, (void *)&shared_variable);
 
     printf("Calling fork()...\n");
+    // Flush stdio buffers before fork() so buffered text is not duplicated into the child
+    fflush(stdout);
+
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -51,6 +55,7 @@ int main(void) {
         printf("  Child modified shared_variable to: %d\n", shared_variable);
         printf("  Child variable address   : %p\n", (void *)&shared_variable);
         printf(">>> [Child Process Completed]\n");
+        fflush(stdout);
 
         exit(EXIT_SUCCESS);
     } else {
@@ -58,7 +63,7 @@ int main(void) {
         // PARENT PROCESS CONTEXT
         // ----------------------------------------------------
         // In the parent, fork() returns the PID of the child.
-        // Brief sleep to allow child to complete printing clearly
+        // Brief sleep lets child print first while executing independently
         sleep(1);
 
         printf("\n<<< [Parent Process Branch]\n");
@@ -69,8 +74,14 @@ int main(void) {
         printf("  Notice: shared_variable remains 100 in the parent!\n");
         printf("  This proves the child received an isolated copy of memory.\n");
         printf("<<< [Parent Process Completed]\n\n");
+
+        // Reap the child process cleanly so no zombie remains
+        int status = 0;
+        if (waitpid(pid, &status, 0) < 0) {
+            perror("waitpid failed");
+            return EXIT_FAILURE;
+        }
     }
 
     return EXIT_SUCCESS;
 }
-

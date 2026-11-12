@@ -63,6 +63,9 @@ A compiled C program running in a Linux virtual address space is organized into 
    - Calling `free()` twice on the exact same heap address causes heap metadata corruption and potential security vulnerabilities.
 4. **Buffer Overflow:**
    - Writing beyond the boundary of an allocated array overwrites adjacent heap control headers or heap objects.
+5. **Integer Multiplication Overflow & 2D Dynamic Arrays:**
+   - Check `count > SIZE_MAX / sizeof(T)` before calling `malloc(count * sizeof(T))` or `realloc(...)` (or use `calloc(count, sizeof(T))`, which checks multiplication overflow automatically).
+   - For 2D pointer arrays (`int **matrix = malloc(rows * sizeof(int *))`), always verify every row allocation; if row $k$ fails, free rows $0..k-1$ and `matrix` before returning, and always free every row before freeing the outer pointer array.
 
 ---
 

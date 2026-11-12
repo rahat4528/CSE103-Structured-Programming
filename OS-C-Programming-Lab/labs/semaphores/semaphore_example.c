@@ -13,9 +13,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <unistd.h>
+#include <time.h>
 
 #define NUM_THREADS 5
 #define MAX_CONCURRENT_ACCESS 2
@@ -24,6 +25,13 @@
 static sem_t resource_semaphore;
 static int active_in_resource = 0;
 static pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void sleep_ms(long milliseconds) {
+    struct timespec ts;
+    ts.tv_sec = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000L;
+    nanosleep(&ts, NULL);
+}
 
 void *worker(void *arg) {
     int id = *(int *)arg;
@@ -37,7 +45,12 @@ void *worker(void *arg) {
     }
 
     // Track active threads inside resource
-    pthread_mutex_lock(&count_mutex);
+    int rc = pthread_mutex_lock(&count_mutex);
+    if (rc != 0) {
+        fprintf(stderr, "pthread_mutex_lock failed: %s\n", strerror(rc));
+        sem_post(&resource_semaphore);
+        return NULL;
+    }
     active_in_resource++;
     int current_active = active_in_resource;
     pthread_mutex_unlock(&count_mutex);
@@ -46,11 +59,12 @@ void *worker(void *arg) {
            id, current_active, MAX_CONCURRENT_ACCESS);
 
     // Simulate work inside the limited resource
-    usleep(200000); // 200 ms
+    sleep_ms(200);
 
-    pthread_mutex_lock(&count_mutex);
-    active_in_resource--;
-    pthread_mutex_unlock(&count_mutex);
+    if (pthread_mutex_lock(&count_mutex) == 0) {
+        active_in_resource--;
+        pthread_mutex_unlock(&count_mutex);
+    }
 
     printf("  <<< [Thread %d] Releasing permit and exiting resource...\n", id);
 
@@ -75,31 +89,54 @@ int main(void) {
     // value = MAX_CONCURRENT_ACCESS: number of concurrent tokens
     if (sem_init(&resource_semaphore, 0, MAX_CONCURRENT_ACCESS) != 0) {
         perror("sem_init failed");
+        pthread_mutex_destroy(&count_mutex);
         return EXIT_FAILURE;
     }
 
     pthread_t threads[NUM_THREADS];
     int thread_ids[NUM_THREADS];
+    int created = 0;
 
     for (int i = 0; i < NUM_THREADS; i++) {
         thread_ids[i] = i + 1;
-        if (pthread_create(&threads[i], NULL, worker, &thread_ids[i]) != 0) {
-            perror("pthread_create failed");
+        int rc = pthread_create(&threads[i], NULL, worker, &thread_ids[i]);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_create failed: %s\n", strerror(rc));
+            for (int j = 0; j < created; j++) {
+                pthread_join(threads[j], NULL);
+            }
+            sem_destroy(&resource_semaphore);
+            pthread_mutex_destroy(&count_mutex);
+            return EXIT_FAILURE;
+        }
+        created++;
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        int rc = pthread_join(threads[i], NULL);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_join failed: %s\n", strerror(rc));
+            sem_destroy(&resource_semaphore);
+            pthread_mutex_destroy(&count_mutex);
             return EXIT_FAILURE;
         }
     }
 
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
+    // Clean up
+    if (sem_destroy(&resource_semaphore) != 0) {
+        perror("sem_destroy failed");
+        pthread_mutex_destroy(&count_mutex);
+        return EXIT_FAILURE;
     }
 
-    // Clean up
-    sem_destroy(&resource_semaphore);
-    pthread_mutex_destroy(&count_mutex);
+    int rc = pthread_mutex_destroy(&count_mutex);
+    if (rc != 0) {
+        fprintf(stderr, "pthread_mutex_destroy failed: %s\n", strerror(rc));
+        return EXIT_FAILURE;
+    }
 
     printf("\n[Done] All threads serviced. Semaphore destroyed successfully.\n");
     printf("====================================================\n");
 
     return EXIT_SUCCESS;
 }
-

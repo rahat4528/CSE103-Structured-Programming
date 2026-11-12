@@ -13,8 +13,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
-#include <unistd.h>
 
 #define NUM_WORKERS 4
 #define OPS_PER_WORKER 1000
@@ -39,7 +39,11 @@ void *account_worker(void *arg) {
     WorkerJob *job = (WorkerJob *)arg;
 
     for (int i = 0; i < OPS_PER_WORKER; i++) {
-        pthread_mutex_lock(&account.lock);
+        int rc = pthread_mutex_lock(&account.lock);
+        if (rc != 0) {
+            fprintf(stderr, "Worker %d mutex_lock failed: %s\n", job->worker_id, strerror(rc));
+            return NULL;
+        }
 
         if (job->is_deposit) {
             account.balance += job->amount;
@@ -53,7 +57,11 @@ void *account_worker(void *arg) {
             }
         }
 
-        pthread_mutex_unlock(&account.lock);
+        rc = pthread_mutex_unlock(&account.lock);
+        if (rc != 0) {
+            fprintf(stderr, "Worker %d mutex_unlock failed: %s\n", job->worker_id, strerror(rc));
+            return NULL;
+        }
     }
 
     return NULL;
@@ -70,13 +78,14 @@ int main(void) {
     account.total_withdrawals = 0;
     account.successful_transactions = 0;
 
-    if (pthread_mutex_init(&account.lock, NULL) != 0) {
-        perror("Failed to init mutex");
+    int rc = pthread_mutex_init(&account.lock, NULL);
+    if (rc != 0) {
+        fprintf(stderr, "Failed to init mutex: %s\n", strerror(rc));
         return EXIT_FAILURE;
     }
 
     printf("[Init] Initial Account Balance: $%ld\n", initial_balance);
-    printf("[Init] Dispatching %d worker threads (%d operations each)...\n\n", 
+    printf("[Init] Dispatching %d worker threads (%d operations each)...\n\n",
            NUM_WORKERS, OPS_PER_WORKER);
 
     pthread_t threads[NUM_WORKERS];
@@ -88,15 +97,27 @@ int main(void) {
     jobs[2] = (WorkerJob){.worker_id = 3, .is_deposit = 0, .amount = 10};
     jobs[3] = (WorkerJob){.worker_id = 4, .is_deposit = 0, .amount = 10};
 
+    int created = 0;
     for (int i = 0; i < NUM_WORKERS; i++) {
-        if (pthread_create(&threads[i], NULL, account_worker, &jobs[i]) != 0) {
-            perror("pthread_create failed");
+        rc = pthread_create(&threads[i], NULL, account_worker, &jobs[i]);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_create failed: %s\n", strerror(rc));
+            for (int j = 0; j < created; j++) {
+                pthread_join(threads[j], NULL);
+            }
+            pthread_mutex_destroy(&account.lock);
             return EXIT_FAILURE;
         }
+        created++;
     }
 
     for (int i = 0; i < NUM_WORKERS; i++) {
-        pthread_join(threads[i], NULL);
+        rc = pthread_join(threads[i], NULL);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_join failed: %s\n", strerror(rc));
+            pthread_mutex_destroy(&account.lock);
+            return EXIT_FAILURE;
+        }
     }
 
     // Verify mathematical invariant
@@ -111,15 +132,20 @@ int main(void) {
     printf("  Processed Transactions  : %d\n", account.successful_transactions);
     printf("-------------------------------------------------\n");
 
+    int exit_status = EXIT_SUCCESS;
     if (account.balance == expected_balance) {
         printf("[SUCCESS] Invariant verified: Mutex prevented all race conditions!\n");
     } else {
         printf("[FAILURE] Data corruption detected!\n");
+        exit_status = EXIT_FAILURE;
     }
 
-    pthread_mutex_destroy(&account.lock);
+    rc = pthread_mutex_destroy(&account.lock);
+    if (rc != 0) {
+        fprintf(stderr, "pthread_mutex_destroy failed: %s\n", strerror(rc));
+        exit_status = EXIT_FAILURE;
+    }
     printf("====================================================\n");
 
-    return EXIT_SUCCESS;
+    return exit_status;
 }
-

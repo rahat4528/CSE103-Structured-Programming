@@ -30,12 +30,15 @@ This folder covers file stream operations in C (`fopen`, `fgets`, `fprintf`, `fp
 - **Important Functions:**
   - `fopen(const char *path, const char *mode)`: Opens stream for file at `path`.
   - `fgets(char *s, int size, FILE *stream)`: Reads at most `size - 1` characters until newline or EOF.
+  - `fread(void *ptr, size_t size, size_t nmemb, FILE *stream)`: Reads buffered byte/record blocks directly into memory.
+  - `ferror(FILE *stream)`: Checks whether a stream read/write error occurred.
   - `fclose(FILE *stream)`: Flushes and releases the file stream.
 - **How It Works:**
   1. Checks if a file path was passed in `argv[1]` or defaults to `class_work/file_handling/sample_input.txt`.
   2. Calls `fopen(filepath, "r")`. If the file does not exist, outputs an explanatory error and exits.
-  3. Loops with `fgets()` until EOF is reached, printing each numbered line.
-  4. Closes the file with `fclose()`.
+  3. Loops with `fgets()` until EOF is reached, strips trailing `\r`/`\n`, and prints each numbered line.
+  4. Rewinds and performs a buffered `fread()` pass to report the total file byte count.
+  5. Closes the file with `fclose()`.
 - **Compilation Command:**
   ```bash
   gcc -std=c11 -Wall -Wextra -Wpedantic class_work/file_handling/file_read.c -o build/class_work/file_handling/file_read
@@ -79,14 +82,17 @@ This folder covers file stream operations in C (`fopen`, `fgets`, `fprintf`, `fp
 - **Required Headers:**
   - `<stdio.h>`
   - `<stdlib.h>`
+  - `<string.h>`
+  - `<sys/stat.h>`
 - **Important Functions:**
   - `fopen(path, "w")`: Opens file for writing (truncating existing contents).
   - `fprintf(stream, format, ...)`: Writes formatted string into stream buffer.
   - `fputs(str, stream)`: Writes unformatted string to stream.
+  - `fwrite(ptr, size, nmemb, stream)`: Writes fixed-size memory blocks directly to the stream buffer.
   - `fclose(stream)`: Flushes internal C library buffer into the kernel and closes descriptor.
 - **How It Works:**
   1. Opens `class_work/file_handling/demo_output.txt` with mode `"w"`.
-  2. Writes structured lab header and status metrics.
+  2. Writes structured lab header and status metrics using `fputs()`, `fprintf()`, and a block footer via `fwrite()`.
   3. Closes stream with `fclose()`, ensuring all buffered bytes are committed to the filesystem.
 - **Compilation Command:**
   ```bash
@@ -170,4 +176,10 @@ This folder covers file stream operations in C (`fopen`, `fgets`, `fprintf`, `fp
   ```
 - **Common Errors:**
   - Assuming `fseek()` can change the write position in append mode: POSIX guarantees that all writes in `"a"` mode are placed at the actual end of the file regardless of previous seek operations.
+
+---
+
+## Crash-Safe Atomic Persistence Note (Connecting to CSE103 Systems)
+
+Writing directly over an existing data file with `"w"` mode truncates the file immediately—if the process crashes mid-write, the old data is lost. In production systems (and in the sibling CSE103 projects `Railway-Management-System` and `c-blood-group-management`), safe persistence writes to a temporary `.tmp` file (checking `fwrite`/`fprintf`, `fflush`, and `fclose`) and only replaces the target file via `rename(tmp_path, target_path)` (optionally keeping a `.bak` copy via a buffered `fread`/`fwrite` loop).
 

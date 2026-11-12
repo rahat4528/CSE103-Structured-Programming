@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 typedef struct {
     int *data;
@@ -20,8 +21,13 @@ typedef struct {
     size_t capacity;
 } IntVector;
 
-// Vector initialization using malloc
+// Vector initialization using malloc + calloc
 IntVector *vector_create(size_t initial_capacity) {
+    if (initial_capacity == 0) {
+        fprintf(stderr, "[Error] Initial vector capacity must be greater than zero.\n");
+        return NULL;
+    }
+
     IntVector *vec = (IntVector *)malloc(sizeof(IntVector));
     if (vec == NULL) {
         perror("Failed to allocate vector container");
@@ -41,14 +47,18 @@ IntVector *vector_create(size_t initial_capacity) {
     return vec;
 }
 
-// Vector append with dynamic reallocation
+// Vector append with dynamic reallocation and overflow check
 int vector_push(IntVector *vec, int value) {
     if (vec == NULL) return -1;
 
     // Expand buffer if capacity is reached
     if (vec->size >= vec->capacity) {
+        if (vec->capacity > (SIZE_MAX / 2) / sizeof(int)) {
+            fprintf(stderr, "[Error] Vector capacity overflow!\n");
+            return -1;
+        }
         size_t new_capacity = vec->capacity * 2;
-        printf("    [Vector Notice] Expanding capacity: %zu -> %zu elements...\n", 
+        printf("    [Vector Notice] Expanding capacity: %zu -> %zu elements...\n",
                vec->capacity, new_capacity);
 
         int *temp = (int *)realloc(vec->data, new_capacity * sizeof(int));
@@ -98,7 +108,7 @@ int main(void) {
 
     printf("[2] Inserting 6 elements sequentially to trigger dynamic reallocations:\n");
     int elements[] = {10, 25, 40, 55, 70, 85};
-    int count = sizeof(elements) / sizeof(elements[0]);
+    int count = (int)(sizeof(elements) / sizeof(elements[0]));
 
     for (int i = 0; i < count; i++) {
         printf("  Pushing element: %d\n", elements[i]);
@@ -109,7 +119,7 @@ int main(void) {
         }
     }
 
-    printf("\n[3] Final Vector Contents (Size = %zu, Capacity = %zu):\n  [ ", 
+    printf("\n[3] Final Vector Contents (Size = %zu, Capacity = %zu):\n  [ ",
            my_vec->size, my_vec->capacity);
     for (size_t i = 0; i < my_vec->size; i++) {
         printf("%d%s", my_vec->data[i], (i == my_vec->size - 1) ? "" : ", ");
@@ -127,4 +137,3 @@ int main(void) {
     printf("====================================================\n");
     return EXIT_SUCCESS;
 }
-

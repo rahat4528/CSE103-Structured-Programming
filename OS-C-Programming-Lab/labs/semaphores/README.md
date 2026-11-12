@@ -12,9 +12,10 @@ This folder covers POSIX counting and binary semaphores, resource pool throttlin
 - **Required Headers:**
   - `<stdio.h>`
   - `<stdlib.h>`
+  - `<string.h>`
   - `<pthread.h>`
   - `<semaphore.h>`
-  - `<unistd.h>`
+  - `<time.h>`: POSIX.1-2008 `nanosleep()` delay helper.
 - **Important Functions:**
   - `sem_init(sem_t *sem, int pshared, unsigned int value)`: Initializes an unnamed semaphore with initial value `value`.
   - `sem_wait(sem_t *sem)`: Decrements (locks) the semaphore; if value is 0, thread blocks until value > 0.
@@ -67,9 +68,10 @@ This folder covers POSIX counting and binary semaphores, resource pool throttlin
 - **Required Headers:**
   - `<stdio.h>`
   - `<stdlib.h>`
+  - `<string.h>`
   - `<pthread.h>`
   - `<semaphore.h>`
-  - `<unistd.h>`
+  - `<time.h>`: POSIX.1-2008 `nanosleep()` delay helper.
 - **Important Functions:**
   - `sem_init()`: Initializes `empty_slots = 5` and `full_slots = 0`.
   - `sem_wait(&empty_slots)`: Blocks producer if buffer is completely full.

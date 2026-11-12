@@ -13,8 +13,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
-#include <unistd.h>
 
 #define NUM_THREADS 5
 #define ITERATIONS_PER_THREAD 100000
@@ -42,12 +42,20 @@ void *synchronized_worker(void *arg) {
     (void)arg;
     for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
         // ENTER CRITICAL SECTION
-        pthread_mutex_lock(&lock);
+        int rc = pthread_mutex_lock(&lock);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_mutex_lock failed: %s\n", strerror(rc));
+            return NULL;
+        }
 
         safe_counter++;
 
         // LEAVE CRITICAL SECTION
-        pthread_mutex_unlock(&lock);
+        rc = pthread_mutex_unlock(&lock);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_mutex_unlock failed: %s\n", strerror(rc));
+            return NULL;
+        }
     }
     return NULL;
 }
@@ -66,15 +74,25 @@ int main(void) {
     printf("[Test 1] Spawning %d threads WITHOUT mutex protection...\n", NUM_THREADS);
     printf("         Each thread executes %d increments.\n", ITERATIONS_PER_THREAD);
 
+    int created = 0;
     for (int i = 0; i < NUM_THREADS; i++) {
-        if (pthread_create(&threads[i], NULL, unsynchronized_worker, NULL) != 0) {
-            perror("pthread_create failed");
+        int rc = pthread_create(&threads[i], NULL, unsynchronized_worker, NULL);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_create failed: %s\n", strerror(rc));
+            for (int j = 0; j < created; j++) {
+                pthread_join(threads[j], NULL);
+            }
             return EXIT_FAILURE;
         }
+        created++;
     }
 
     for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
+        int rc = pthread_join(threads[i], NULL);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_join failed: %s\n", strerror(rc));
+            return EXIT_FAILURE;
+        }
     }
 
     printf("  Expected Count : %ld\n", expected_total);
@@ -91,21 +109,33 @@ int main(void) {
     // ----------------------------------------------------
     printf("[Test 2] Spawning %d threads WITH pthread_mutex_t protection...\n", NUM_THREADS);
 
-    // Initialize mutex
-    if (pthread_mutex_init(&lock, NULL) != 0) {
-        perror("pthread_mutex_init failed");
+    int rc = pthread_mutex_init(&lock, NULL);
+    if (rc != 0) {
+        fprintf(stderr, "pthread_mutex_init failed: %s\n", strerror(rc));
         return EXIT_FAILURE;
     }
 
+    created = 0;
     for (int i = 0; i < NUM_THREADS; i++) {
-        if (pthread_create(&threads[i], NULL, synchronized_worker, NULL) != 0) {
-            perror("pthread_create failed");
+        rc = pthread_create(&threads[i], NULL, synchronized_worker, NULL);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_create failed: %s\n", strerror(rc));
+            for (int j = 0; j < created; j++) {
+                pthread_join(threads[j], NULL);
+            }
+            pthread_mutex_destroy(&lock);
             return EXIT_FAILURE;
         }
+        created++;
     }
 
     for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
+        rc = pthread_join(threads[i], NULL);
+        if (rc != 0) {
+            fprintf(stderr, "pthread_join failed: %s\n", strerror(rc));
+            pthread_mutex_destroy(&lock);
+            return EXIT_FAILURE;
+        }
     }
 
     printf("  Expected Count : %ld\n", expected_total);
@@ -114,11 +144,14 @@ int main(void) {
         printf("  [RESULT] SUCCESS! Mutex guaranteed mutual exclusion and atomic consistency.\n\n");
     }
 
-    // Destroy mutex
-    pthread_mutex_destroy(&lock);
+    rc = pthread_mutex_destroy(&lock);
+    if (rc != 0) {
+        fprintf(stderr, "pthread_mutex_destroy failed: %s\n", strerror(rc));
+        return EXIT_FAILURE;
+    }
+
     printf("  Mutex cleanly destroyed via pthread_mutex_destroy().\n");
     printf("====================================================\n");
 
-    return EXIT_SUCCESS;
+    return (safe_counter == expected_total) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-
