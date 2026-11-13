@@ -1,0 +1,10 @@
+# CSE103-OS Build Artifacts
+build/
+bin/
+*.o
+*.elf
+*.bin
+*.iso
+*.img
+*.log
+isodir/
